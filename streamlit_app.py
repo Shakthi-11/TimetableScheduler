@@ -3,7 +3,7 @@ import streamlit as st
 from scheduler import generate_timetable
 from utils import export_to_excel, export_to_pdf
 
-# 1. PAGE SETUP
+# 1. PAGE CONFIGURATION
 st.set_page_config(
     page_title="SRMIST Vadapalani - Timetable Scheduler",
     page_icon="📅",
@@ -11,13 +11,13 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# 2. BRANDING ASSETS
+# 2. LOGO URL & BRANDING ASSETS
 SRM_LOGO_URL = "https://www.srmistvdp.edu.in/uploads/51ba570fe68fc088e0a942bdf8700cdce7eb8b1d/1766992169SRMIST-Vadapalani.webp"
 
-# 3. 3D METALLIC BLUE THEME & CUSTOM CSS
+# 3. 3D METALLIC BLUE CUSTOM CSS
 st.markdown("""
 <style>
-    /* Hide Streamlit Sidebar Completely */
+    /* Hide Sidebar Completely */
     [data-testid="stSidebar"] {
         display: none !important;
     }
@@ -40,7 +40,6 @@ st.markdown("""
         margin-bottom: 2.2rem;
         position: relative;
         overflow: hidden;
-        /* 3D Depth & Lighting Effects */
         box-shadow: 
             0 14px 30px -5px rgba(0, 51, 102, 0.6),
             0 6px 15px -2px rgba(0, 0, 0, 0.4),
@@ -89,9 +88,9 @@ st.markdown("""
         text-shadow: 0 1px 3px rgba(0,0,0,0.8);
     }
 
-    /* High-Contrast Section Headings (Legible in Dark/Light themes) */
+    /* High-Contrast Headings */
     h2, h3, h4 {
-        color: #38bdf8 !important; /* Vivid Light Blue for readability */
+        color: #38bdf8 !important;
         font-weight: 700 !important;
         margin-top: 1rem !important;
         text-shadow: 0 2px 4px rgba(0,0,0,0.3);
@@ -116,7 +115,7 @@ st.markdown("""
         border-bottom: 3px solid #38bdf8 !important;
     }
 
-    /* 3D Action Buttons */
+    /* 3D Primary Action Buttons */
     .stButton>button[type="primary"], .stButton>button {
         background: linear-gradient(180deg, #004080 0%, #002b55 100%) !important;
         color: #ffffff !important;
@@ -135,12 +134,7 @@ st.markdown("""
         box-shadow: 0 6px 16px rgba(0, 89, 179, 0.5) !important;
     }
 
-    .stButton>button:active {
-        transform: translateY(1px) !important;
-        border-bottom: 1px solid #001a33 !important;
-    }
-
-    /* 3D Metric Cards */
+    /* Metric Card Styling */
     [data-testid="stMetric"] {
         background: linear-gradient(145deg, rgba(15, 23, 42, 0.7), rgba(30, 41, 59, 0.7));
         border: 1px solid rgba(56, 189, 248, 0.25);
@@ -156,7 +150,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# 4. 3D BANNER WITH ENLARGED SRM LOGO
+# 4. HEADER BANNER
 st.markdown(f"""
 <div class="srm-banner-3d">
     <div style="display: flex; align-items: center; gap: 2rem;">
@@ -178,7 +172,7 @@ with tab1:
     st.subheader("1. Department Institutional Settings")
     c1, c2, c3, c4 = st.columns(4)
     with c1:
-        department = st.text_input("Department Profile", " ")
+        department = st.text_input("Department Profile", "B.Tech Computer Science")
     with c2:
         semester = st.selectbox("Current Semester", [1, 2, 3, 4, 5, 6, 7, 8], index=3)
     with c3:
@@ -191,13 +185,12 @@ with tab1:
     
     num_subjects_col1, num_subjects_col2 = st.columns([1, 4])
     with num_subjects_col1:
-        num_subjects = st.number_input("Count of Subjects / Labs", min_value=1, max_value=15, value=4)
+        num_subjects = st.number_input("Count of Subjects / Labs", min_value=1, max_value=15, value=5)
 
     subject_data = []
     for i in range(num_subjects):
         st.markdown(f"#### Subject {i+1} Details")
         
-        # Native Streamlit Bordered Container (Fixes white bar bug)
         with st.container(border=True):
             col1, col2, col3, col4 = st.columns(4)
 
@@ -213,29 +206,51 @@ with tab1:
         subject_data.append({"Subject": subject, "Faculty": faculty, "Hours": hours, "Type": stype})
 
     st.divider()
-    st.subheader("3. Faculty Constraint Profiles")
+    st.subheader("3. Faculty Constraint Profiles & Daily Limits")
     unique_faculties = sorted(list(set(s["Faculty"] for s in subject_data if s.get("Faculty"))))
     days_list = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"][:working_days]
 
     faculty_availability = {}
+    faculty_daily_limits = {}
+
     if unique_faculties:
         f_cols = st.columns(min(len(unique_faculties), 4))
         for idx, fac in enumerate(unique_faculties):
             with f_cols[idx % len(f_cols)]:
                 with st.container(border=True):
                     st.write(f"👤 **{fac}**")
+                    st.caption("Day Availability & Max Hours Limit")
+                    
                     faculty_availability[fac] = {}
-                    inner_days_col1, inner_days_col2 = st.columns([1, 1])
-                    for day_idx, day in enumerate(days_list):
-                        current_col = inner_days_col1 if day_idx % 2 == 0 else inner_days_col2
-                        with current_col:
-                            faculty_availability[fac][day] = st.checkbox(f"{day}", value=True, key=f"{fac}_{day}")
+                    faculty_daily_limits[fac] = {}
+
+                    h1, h2 = st.columns([1.2, 1])
+                    h1.caption("Active Day")
+                    h2.caption("Max Hrs")
+
+                    for day in days_list:
+                        col_check, col_limit = st.columns([1.2, 1])
+                        with col_check:
+                            is_avail = st.checkbox(f"{day[:3]}", value=True, key=f"avail_{fac}_{day}")
+                            faculty_availability[fac][day] = is_avail
+                        with col_limit:
+                            max_hr = st.number_input(
+                                label=f"Max hours for {fac} on {day}",
+                                min_value=0,
+                                max_value=int(hours_per_day),
+                                value=3 if is_avail else 0,
+                                disabled=not is_avail,
+                                key=f"limit_{fac}_{day}",
+                                label_visibility="collapsed"
+                            )
+                            faculty_daily_limits[fac][day] = max_hr
 
 with tab2:
     if st.button("🚀 Generate Smart Institutional Timetable", type="primary", use_container_width=True):
-        timetable, conflicts = generate_timetable(subject_data, working_days, hours_per_day, faculty_availability)
+        timetable, conflicts = generate_timetable(
+            subject_data, working_days, hours_per_day, faculty_availability, faculty_daily_limits
+        )
 
-        # Metrics Row
         m1, m2, m3 = st.columns(3)
         total_slots = working_days * hours_per_day
         assigned_slots = (timetable != "FREE").sum().sum()
@@ -247,7 +262,6 @@ with tab2:
         with m3:
             st.metric(label="⏳ Remaining FREE Slots", value=total_slots - assigned_slots, help="Available free hours in the schedule")
 
-        # Conflict Detection Panel
         st.divider()
         st.markdown("### ⚠️ Constraint Conflict Detection")
         if conflicts:
@@ -265,11 +279,9 @@ with tab2:
             </div>
             """, unsafe_allow_html=True)
 
-        # Timetable Grid
         st.markdown("### 🗓️ Generated Schedule Matrix")
         st.dataframe(timetable, use_container_width=True)
 
-        # Export Utility
         st.divider()
         st.markdown("### 📥 Branded Export Utility")
 
