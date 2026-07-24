@@ -1,105 +1,89 @@
-import random
 import pandas as pd
 
-
-def generate_timetable(subjects, working_days, hours_per_day, faculty_availability=None):
-    if faculty_availability is None:
-        faculty_availability = {}
-
+def generate_timetable(subject_data, working_days, hours_per_day, faculty_availability, faculty_daily_limits=None):
     days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"][:working_days]
-    hours = [f"Hour {i}" for i in range(1, hours_per_day + 1)]
-
+    hours = [f"Hour {h+1}" for h in range(hours_per_day)]
+    
     timetable = pd.DataFrame("FREE", index=days, columns=hours)
     conflicts = []
+    
+    faculty_daily_hours = {fac: {day: 0 for day in days} for fac in faculty_availability}
+    labs_per_day = {day: 0 for day in days}
 
-    # Total available slots check
-    total_slots = working_days * hours_per_day
-    total_required_hours = sum(int(s.get("Hours", 0)) for s in subjects if s.get("Subject"))
+    def get_max_limit(faculty, day):
+        if faculty_daily_limits and faculty in faculty_daily_limits:
+            return faculty_daily_limits[faculty].get(day, 3)
+        return 3
 
-    if total_required_hours > total_slots:
-        conflicts.append(
-            f"Overbooked! Total required hours ({total_required_hours}) exceed available weekly slots ({total_slots})."
-        )
-
-    # Separate labs (require 2 consecutive slots) and theory
-    labs = [s for s in subjects if s.get("Type") == "Lab" and s.get("Subject")]
-    theory = [s for s in subjects if s.get("Type") != "Lab" and s.get("Subject")]
-
-    # 1. Schedule Labs in 2 consecutive slots
-    for lab in labs:
-        remaining_hours = int(lab.get("Hours", 2))
-        faculty = lab.get("Faculty", "")
-        subject_name = lab.get("Subject", "")
-
-        while remaining_hours >= 2:
-            placed = False
-            for day in days:
-                if placed:
-                    break
-                for h_idx in range(hours_per_day - 1):
-                    h1, h2 = hours[h_idx], hours[h_idx + 1]
-
-                    # Check if both consecutive hours are FREE
-                    if timetable.loc[day, h1] == "FREE" and timetable.loc[day, h2] == "FREE":
-                        # Check faculty availability
-                        if faculty in faculty_availability and not faculty_availability[faculty].get(day, True):
-                            continue
-
-                        entry = f"🔬 {subject_name}\n({faculty})\n[Lab]"
-                        timetable.loc[day, h1] = entry
-                        timetable.loc[day, h2] = entry
-                        remaining_hours -= 2
-                        placed = True
-                        break
-
-            if not placed:
-                conflicts.append(f"Could not place full lab duration for {subject_name}.")
+    # 1. Allocate Labs (2 continuous hours required)
+    lab_subjects = [s for s in subject_data if s.get("Type") == "Lab"]
+    for sub in lab_subjects:
+        name = sub["Subject"]
+        faculty = sub["Faculty"]
+        total_hours = sub["Hours"]
+        allocated = 0
+        
+        for day in days:
+            if allocated >= total_hours:
                 break
-
-    # 2. Schedule Theory slots
-    theory_pool = []
-    for s in theory:
-        for _ in range(int(s.get("Hours", 1))):
-            theory_pool.append(s)
-
-    random.shuffle(theory_pool)
-
-    for day in days:
-        used_today = set()
-
-        for hour in hours:
-            if timetable.loc[day, hour] != "FREE":
+                
+            if labs_per_day[day] >= 1:
+                continue
+                
+            if faculty in faculty_availability and not faculty_availability[faculty].get(day, True):
                 continue
 
-            placed = False
-            random.shuffle(theory_pool)
+            max_daily = get_max_limit(faculty, day)
+            current_hrs = faculty_daily_hours.get(faculty, {}).get(day, 0)
+            if current_hrs + 2 > max_daily:
+                continue
 
-            for sub in theory_pool:
-                sub_name = sub.get("Subject", "")
-                faculty = sub.get("Faculty", "")
-
-                if sub_name in used_today:
-                    continue
-
-                if faculty in faculty_availability and not faculty_availability[faculty].get(day, True):
-                    continue
-
-                timetable.loc[day, hour] = f"📖 {sub_name}\n({faculty})\n[Theory]"
-                used_today.add(sub_name)
-                theory_pool.remove(sub)
-                placed = True
-                break
-
-            # Fallback pass if all remaining subjects were used today
-            if not placed and theory_pool:
-                for sub in theory_pool:
-                    faculty = sub.get("Faculty", "")
-                    if faculty in faculty_availability and not faculty_availability[faculty].get(day, True):
-                        continue
-
-                    timetable.loc[day, hour] = f"📖 {sub.get('Subject', '')}\n({faculty})\n[Theory]"
-                    theory_pool.remove(sub)
-                    placed = True
+            for h in range(hours_per_day - 1):
+                slot1, slot2 = hours[h], hours[h+1]
+                
+                if timetable.loc[day, slot1] == "FREE" and timetable.loc[day, slot2] == "FREE":
+                    label = f"{name} ({faculty}) [Lab]"
+                    timetable.loc[day, slot1] = label
+                    timetable.loc[day, slot2] = label
+                    
+                    allocated += 2
+                    labs_per_day[day] += 1
+                    if faculty in faculty_daily_hours:
+                        faculty_daily_hours[faculty][day] += 2
                     break
+        
+        if allocated < total_hours:
+            conflicts.append(f"Could not allocate required hours for Lab: {name} ({faculty})")
+
+    # 2. Allocate Theory Subjects (1 hour slots)
+    theory_subjects = [s for s in subject_data if s.get("Type") == "Theory"]
+    for sub in theory_subjects:
+        name = sub["Subject"]
+        faculty = sub["Faculty"]
+        total_hours = sub["Hours"]
+        allocated = 0
+        
+        for day in days:
+            if allocated >= total_hours:
+                break
+                
+            if faculty in faculty_availability and not faculty_availability[faculty].get(day, True):
+                continue
+                
+            max_daily = get_max_limit(faculty, day)
+            current_hrs = faculty_daily_hours.get(faculty, {}).get(day, 0)
+            if current_hrs + 1 > max_daily:
+                continue
+
+            for h in hours:
+                if timetable.loc[day, h] == "FREE":
+                    timetable.loc[day, h] = f"{name} ({faculty}) [Theory]"
+                    allocated += 1
+                    if faculty in faculty_daily_hours:
+                        faculty_daily_hours[faculty][day] += 1
+                    break
+
+        if allocated < total_hours:
+            conflicts.append(f"Could not allocate required hours for Theory: {name} ({faculty})")
 
     return timetable, conflicts
