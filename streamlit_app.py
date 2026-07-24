@@ -1,11 +1,11 @@
 import pandas as pd
 import streamlit as st
-from scheduler import generate_timetable
+from scheduler import StaffRegistry, FacultyMember, InstitutionalScheduler
 from utils import export_to_excel, export_to_pdf
 
 # 1. PAGE CONFIGURATION
 st.set_page_config(
-    page_title="SRMIST Vadapalani - Timetable Scheduler",
+    page_title="SRMIST Vadapalani - Institutional ERP Timetable Scheduler",
     page_icon="📅",
     layout="wide",
     initial_sidebar_state="collapsed"
@@ -158,116 +158,226 @@ st.markdown(f"""
             <img src="{SRM_LOGO_URL}" width="140px" style="display: block;">
         </div>
         <div>
-            <h1 class="srm-title-3d">Smart Timetable Scheduler</h1>
+            <h1 class="srm-title-3d">University-Wide ERP Timetable Scheduler</h1>
             <p class="srm-subtitle-3d">SRM Institute of Science and Technology • <span class="vdp-badge-3d">VADAPALANI</span> Campus</p>
         </div>
     </div>
 </div>
 """, unsafe_allow_html=True)
 
-# 5. MAIN NAVIGATION TABS
-tab1, tab2 = st.tabs(["Setup & Configuration", "Live Timetable & Metrics"])
+# 5. INITIALIZE STATE & DEFAULT PRESETS
+if "faculty_registry_data" not in st.session_state:
+    st.session_state.faculty_registry_data = [
+        {"Faculty_ID": "MR", "Name": "Prof. MR", "Primary_Dept": "B.Tech CS", "Qualified": "Python, Python Lab, AI", "Max_Daily": 4, "Max_Cons": 2},
+        {"Faculty_ID": "VR", "Name": "Prof. VR", "Primary_Dept": "B.Tech CS", "Qualified": "ML, ML Lab, Data Mining", "Max_Daily": 4, "Max_Cons": 2},
+        {"Faculty_ID": "JP", "Name": "Dr. JP", "Primary_Dept": "B.Tech ECE", "Qualified": "Project-c, Ethics, Signals", "Max_Daily": 4, "Max_Cons": 2},
+        {"Faculty_ID": "JPS", "Name": "Prof. JPS", "Primary_Dept": "B.Tech ECE", "Qualified": "Signals, Systems, Project-OOPS", "Max_Daily": 4, "Max_Cons": 2},
+    ]
 
-with tab1:
-    st.subheader("1. Department Institutional Settings")
+if "depts_curriculum" not in st.session_state:
+    st.session_state.depts_curriculum = {
+        "B.Tech Computer Science": [
+            {"Subject": "Python", "Faculty": "MR", "Hours": 4, "Type": "Theory", "Category": "Core Theory"},
+            {"Subject": "Python Lab", "Faculty": "MR", "Hours": 3, "Type": "Lab", "Category": "Lab"},
+            {"Subject": "ML", "Faculty": "VR", "Hours": 3, "Type": "Theory", "Category": "Core Theory"},
+            {"Subject": "ML Lab", "Faculty": "VR", "Hours": 3, "Type": "Lab", "Category": "Lab"},
+        ],
+        "B.Tech Electronics & Comm": [
+            {"Subject": "Signals & Systems", "Faculty": "JPS", "Hours": 3, "Type": "Theory", "Category": "Core Theory"},
+            {"Subject": "ML", "Faculty": "VR", "Hours": 3, "Type": "Theory", "Category": "Core Theory"}, # VR shared across departments!
+            {"Subject": "Project-c", "Faculty": "JP", "Hours": 2, "Type": "Theory", "Category": "Core Theory"},
+        ]
+    }
+
+if "combined_classes_data" not in st.session_state:
+    st.session_state.combined_classes_data = [
+        {
+            "Subject": "Ethics in Tech",
+            "Faculty": "JP",
+            "ParticipatingDepts": ["B.Tech Computer Science", "B.Tech Electronics & Comm"],
+            "Hours": 2,
+            "Type": "Theory"
+        }
+    ]
+
+# 6. MAIN NAVIGATION TABS
+tab_staff, tab_depts, tab_combined, tab_results = st.tabs([
+    "👤 Staff Registry & Fatigue Limits",
+    "🏢 Multi-Department Curriculums",
+    "🔗 Combined Classes Config",
+    "🚀 Institutional Timetable & Global State Matrix"
+])
+
+# ----------------------------------------------------
+# TAB 1: STAFF REGISTRY & QUALIFICATIONS
+# ----------------------------------------------------
+with tab_staff:
+    st.subheader("1. University Staff Registry & Qualification Engine")
+    st.caption("Manage faculty profiles, qualified course mappings, daily contact limits, and continuous teaching break rules.")
+
+    registry_df = pd.DataFrame(st.session_state.faculty_registry_data)
+    edited_registry = st.data_editor(
+        registry_df,
+        num_rows="dynamic",
+        use_container_width=True,
+        column_config={
+            "Faculty_ID": st.column_config.TextColumn("Faculty ID / Code", required=True),
+            "Name": st.column_config.TextColumn("Faculty Name"),
+            "Primary_Dept": st.column_config.TextColumn("Primary Department"),
+            "Qualified": st.column_config.TextColumn("Qualified Subjects (Comma-Separated)"),
+            "Max_Daily": st.column_config.NumberColumn("Max Daily Hours", min_value=1, max_value=8, default=4),
+            "Max_Cons": st.column_config.NumberColumn("Max Continuous Hours (Rest Buffer)", min_value=1, max_value=4, default=2),
+        },
+        key="registry_editor"
+    )
+
+    st.session_state.faculty_registry_data = edited_registry.to_dict("records")
+
+# ----------------------------------------------------
+# TAB 2: MULTI-DEPARTMENT CURRICULUMS
+# ----------------------------------------------------
+with tab_depts:
+    st.subheader("2. Institutional Operating Rules & Department Curriculums")
+
     c1, c2, c3, c4 = st.columns(4)
     with c1:
-        department = st.text_input("Department Profile", "B.Tech Computer Science")
+        working_days = st.number_input("Weekly Working Days", 1, 7, 4)
     with c2:
-        semester = st.selectbox("Current Semester", [1, 2, 3, 4, 5, 6, 7, 8], index=3)
-    with c3:
-        working_days = st.number_input("Weekly Working Days", 1, 7, 5)
-    with c4:
         hours_per_day = st.number_input("Daily Operating Hours", 1, 10, 6)
+    with c3:
+        break_option = st.selectbox("Institutional Lunch Break Slot", ["Hour IV (Lunch)", "Hour III (Lunch)", "None"], index=0)
+    with c4:
+        semester = st.selectbox("Current Semester", [1, 2, 3, 4, 5, 6, 7, 8], index=3)
+
+    break_slot_map = {"Hour IV (Lunch)": 3, "Hour III (Lunch)": 2, "None": None}
+    break_slot_idx = break_slot_map.get(break_option)
 
     st.divider()
-    st.subheader("2. Subject & Lab Allocation (Input Grid)")
-    
-    num_subjects_col1, num_subjects_col2 = st.columns([1, 4])
-    with num_subjects_col1:
-        num_subjects = st.number_input("Count of Subjects / Labs", min_value=1, max_value=15, value=5)
+    st.subheader("Department Curriculums Setup")
 
-    subject_data = []
-    for i in range(num_subjects):
-        st.markdown(f"#### Subject {i+1} Details")
+    available_faculties = [f["Faculty_ID"] for f in st.session_state.faculty_registry_data if f.get("Faculty_ID")]
+
+    dept_names = list(st.session_state.depts_curriculum.keys())
+    selected_dept = st.selectbox("Select Department to Configure", dept_names)
+
+    if st.button("➕ Add New Department"):
+        new_dept_name = f"Department {len(dept_names)+1}"
+        st.session_state.depts_curriculum[new_dept_name] = []
+        st.rerun()
+
+    if selected_dept:
+        st.markdown(f"#### Managing Curriculum for **{selected_dept}**")
+        curr_list = st.session_state.depts_curriculum[selected_dept]
         
-        with st.container(border=True):
-            col1, col2, col3, col4 = st.columns(4)
-
-            with col1:
-                subject = st.text_input("Course Code / Name", key=f"subject_{i}", value=f"Course {i+1}")
-            with col2:
-                faculty = st.text_input("Assigned Faculty", key=f"faculty_{i}", value=f"Prof. {chr(65+i)}")
-            with col3:
-                hours = st.number_input("Weekly Contact Hours", 1, 10, 4 if i % 2 == 0 else 2, key=f"hours_{i}")
-            with col4:
-                stype = st.selectbox("Allocation Type", ["Theory", "Lab"], key=f"type_{i}", index=1 if i == 1 else 0)
-
-        subject_data.append({"Subject": subject, "Faculty": faculty, "Hours": hours, "Type": stype})
-
-    st.divider()
-    st.subheader("3. Faculty Constraint Profiles & Daily Limits")
-    unique_faculties = sorted(list(set(s["Faculty"] for s in subject_data if s.get("Faculty"))))
-    days_list = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"][:working_days]
-
-    faculty_availability = {}
-    faculty_daily_limits = {}
-
-    if unique_faculties:
-        f_cols = st.columns(min(len(unique_faculties), 4))
-        for idx, fac in enumerate(unique_faculties):
-            with f_cols[idx % len(f_cols)]:
-                with st.container(border=True):
-                    st.write(f"👤 **{fac}**")
-                    st.caption("Day Availability & Max Hours Limit")
-                    
-                    faculty_availability[fac] = {}
-                    faculty_daily_limits[fac] = {}
-
-                    h1, h2 = st.columns([1.2, 1])
-                    h1.caption("Active Day")
-                    h2.caption("Max Hrs")
-
-                    for day in days_list:
-                        col_check, col_limit = st.columns([1.2, 1])
-                        with col_check:
-                            is_avail = st.checkbox(f"{day[:3]}", value=True, key=f"avail_{fac}_{day}")
-                            faculty_availability[fac][day] = is_avail
-                        with col_limit:
-                            max_hr = st.number_input(
-                                label=f"Max hours for {fac} on {day}",
-                                min_value=0,
-                                max_value=int(hours_per_day),
-                                value=3 if is_avail else 0,
-                                disabled=not is_avail,
-                                key=f"limit_{fac}_{day}",
-                                label_visibility="collapsed"
-                            )
-                            faculty_daily_limits[fac][day] = max_hr
-
-with tab2:
-    if st.button("🚀 Generate Smart Institutional Timetable", type="primary", use_container_width=True):
-        timetable, conflicts = generate_timetable(
-            subject_data, working_days, hours_per_day, faculty_availability, faculty_daily_limits
+        dept_df = pd.DataFrame(curr_list) if curr_list else pd.DataFrame(columns=["Subject", "Faculty", "Hours", "Type", "Category"])
+        
+        edited_dept_df = st.data_editor(
+            dept_df,
+            num_rows="dynamic",
+            use_container_width=True,
+            column_config={
+                "Subject": st.column_config.TextColumn("Course Code / Name", required=True),
+                "Faculty": st.column_config.SelectboxColumn("Assigned Faculty", options=available_faculties, required=True),
+                "Hours": st.column_config.NumberColumn("Weekly Contact Hours", min_value=1, max_value=10, default=3),
+                "Type": st.column_config.SelectboxColumn("Type", options=["Theory", "Lab"], default="Theory"),
+                "Category": st.column_config.SelectboxColumn("Category", options=["Core Theory", "Elective Theory", "Lab"], default="Core Theory"),
+            },
+            key=f"dept_editor_{selected_dept}"
         )
 
-        m1, m2, m3 = st.columns(3)
-        total_slots = working_days * hours_per_day
-        assigned_slots = (timetable != "FREE").sum().sum()
+        st.session_state.depts_curriculum[selected_dept] = edited_dept_df.to_dict("records")
 
+# ----------------------------------------------------
+# TAB 3: COMBINED CLASSES CONFIG
+# ----------------------------------------------------
+with tab_combined:
+    st.subheader("3. Combined / Merged Multi-Department Sessions")
+    st.caption("Schedule joint lectures where a single faculty teaches multiple department sections simultaneously in the exact same slot.")
+
+    comb_df = pd.DataFrame(st.session_state.combined_classes_data)
+    edited_comb_df = st.data_editor(
+        comb_df,
+        num_rows="dynamic",
+        use_container_width=True,
+        column_config={
+            "Subject": st.column_config.TextColumn("Joint Course Name", required=True),
+            "Faculty": st.column_config.SelectboxColumn("Assigned Faculty", options=available_faculties, required=True),
+            "ParticipatingDepts": st.column_config.ListColumn("Participating Departments"),
+            "Hours": st.column_config.NumberColumn("Weekly Contact Hours", min_value=1, max_value=6, default=2),
+            "Type": st.column_config.SelectboxColumn("Type", options=["Theory", "Lab"], default="Theory"),
+        },
+        key="combined_editor"
+    )
+
+    st.session_state.combined_classes_data = edited_comb_df.to_dict("records")
+
+# ----------------------------------------------------
+# TAB 4: INSTITUTIONAL EXECUTION & RESULTS
+# ----------------------------------------------------
+with tab_results:
+    if st.button("🚀 Generate University-Wide ERP Timetable", type="primary", use_container_width=True):
+        # Build StaffRegistry object
+        registry = StaffRegistry()
+        for f in st.session_state.faculty_registry_data:
+            f_id = f.get("Faculty_ID", "").strip()
+            if f_id:
+                quals = [q.strip() for q in str(f.get("Qualified", "")).split(",") if q.strip()]
+                registry.add_faculty(FacultyMember(
+                    faculty_id=f_id,
+                    name=f.get("Name", f_id),
+                    primary_dept=f.get("Primary_Dept", ""),
+                    qualified_subjects=quals,
+                    max_daily_hours=int(f.get("Max_Daily", 4)),
+                    max_consecutive_hours=int(f.get("Max_Cons", 2))
+                ))
+
+        # Build departments_data dict
+        departments_data = {}
+        for d_name, sub_list in st.session_state.depts_curriculum.items():
+            departments_data[d_name] = {
+                "subject_data": sub_list,
+                "break_slot_idx": break_slot_idx
+            }
+
+        # Instantiate Institutional Scheduler
+        scheduler = InstitutionalScheduler(
+            departments_data=departments_data,
+            staff_registry=registry,
+            combined_classes=st.session_state.combined_classes_data,
+            working_days=int(working_days),
+            hours_per_day=int(hours_per_day),
+            use_day_orders=True
+        )
+
+        dept_timetables, conflicts, metrics = scheduler.generate_all()
+
+        st.session_state.last_dept_timetables = dept_timetables
+        st.session_state.last_conflicts = conflicts
+        st.session_state.last_metrics = metrics
+        st.session_state.last_global_matrix = scheduler.global_matrix
+
+    if "last_dept_timetables" in st.session_state:
+        dept_timetables = st.session_state.last_dept_timetables
+        conflicts = st.session_state.last_conflicts
+        metrics = st.session_state.last_metrics
+        global_matrix = st.session_state.last_global_matrix
+
+        m1, m2, m3, m4 = st.columns(4)
         with m1:
-            st.metric(label="📊 Institutional Slot Capacity", value=total_slots, help="Weekly available operating hours")
+            st.metric(label="🏢 Total Departments", value=metrics["total_departments"])
         with m2:
-            st.metric(label="⏱️ Weekly Allocated Hours", value=assigned_slots, help="Total scheduled hours including theory and lab")
+            st.metric(label="👤 Faculty Matrix Tracked", value=metrics["total_faculty"])
         with m3:
-            st.metric(label="⏳ Remaining FREE Slots", value=total_slots - assigned_slots, help="Available free hours in the schedule")
+            st.metric(label="⏱️ Total Allocated Hours", value=metrics["total_allocated_slots"])
+        with m4:
+            st.metric(label="📊 Institutional Capacity", value=metrics["total_institution_slots"])
 
         st.divider()
-        st.markdown("### ⚠️ Constraint Conflict Detection")
+        st.markdown("### ⚠️ Institutional Conflict & Fatigue Diagnostics")
         if conflicts:
             st.markdown("""
             <div style="background-color: #450a0a; border: 1px solid #f87171; padding: 1rem 1.5rem; border-radius: 8px; border-left: 5px solid #ef4444; margin-bottom: 1.5rem;">
-                <p style="color: #fca5a5; font-weight: 700; margin-top: 0;">Constraint Violations Identified:</p>
+                <p style="color: #fca5a5; font-weight: 700; margin-top: 0;">Institutional Schedule Warnings / Qualification Alerts Identified:</p>
             </div>
             """, unsafe_allow_html=True)
             for conf in conflicts:
@@ -275,12 +385,31 @@ with tab2:
         else:
             st.markdown("""
             <div style="background-color: #052e16; border: 1px solid #4ade80; padding: 1rem 1.5rem; border-radius: 8px; border-left: 5px solid #22c55e; margin-bottom: 1.5rem;">
-                <p style="color: #86efac; font-weight: 700; margin: 0; font-size: 1.05rem;">✅ Optimized: Zero Schedule Violations Detected.</p>
+                <p style="color: #86efac; font-weight: 700; margin: 0; font-size: 1.05rem;">✅ Zero Cross-Department Double-Bookings Detected. Global Faculty Matrix State Verified with Rest Breaks Enforced.</p>
             </div>
             """, unsafe_allow_html=True)
 
-        st.markdown("### 🗓️ Generated Schedule Matrix")
-        st.dataframe(timetable, use_container_width=True)
+        st.markdown("### 🗓️ View Timetable Matrices")
+
+        v_tab1, v_tab2, v_tab3 = st.tabs(["🏢 Department Class Grids", "👤 Global Faculty Master Matrix", "📈 Workload Analytics"])
+
+        with v_tab1:
+            selected_v_dept = st.selectbox("Select Department View", list(dept_timetables.keys()))
+            if selected_v_dept in dept_timetables:
+                st.dataframe(dept_timetables[selected_v_dept], use_container_width=True)
+
+        with v_tab2:
+            all_fac_ids = sorted(list(global_matrix.faculty_ids))
+            selected_fac = st.selectbox("Select Faculty Master Schedule", all_fac_ids)
+            if selected_fac:
+                fac_df = global_matrix.to_dataframe(selected_fac)
+                st.markdown(f"#### Master Schedule Matrix for **{selected_fac}** (Cross-Department View)")
+                st.dataframe(fac_df, use_container_width=True)
+
+        with v_tab3:
+            dept_load = {d: m["allocated_slots"] for d, m in metrics["dept_metrics"].items()}
+            chart_df = pd.DataFrame(list(dept_load.items()), columns=["Department", "Allocated Contact Hours"])
+            st.bar_chart(chart_df.set_index("Department"), use_container_width=True)
 
         st.divider()
         st.markdown("### 📥 Branded Export Utility")
@@ -288,21 +417,21 @@ with tab2:
         col_ex1, col_ex2 = st.columns(2)
 
         with col_ex1:
-            excel_bytes = export_to_excel(timetable)
+            excel_bytes = export_to_excel(dept_timetables, global_matrix, metrics)
             st.download_button(
-                label="📊 Download Final Excel (.xlsx)",
+                label="📊 Download Multi-Sheet Excel Workbook (.xlsx)",
                 data=excel_bytes,
-                file_name=f"SRMIST_VDP_Timetable_{department}_Sem{semester}.xlsx",
+                file_name=f"SRMIST_VDP_University_Timetable_Sem{semester}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 use_container_width=True
             )
 
         with col_ex2:
-            pdf_bytes = export_to_pdf(timetable, department, semester)
+            pdf_bytes = export_to_pdf(dept_timetables, "University ERP", semester, global_matrix)
             st.download_button(
-                label="📄 Generate Formal PDF Report (.pdf)",
+                label="📄 Generate Formal PDF Institutional Report (.pdf)",
                 data=pdf_bytes,
-                file_name=f"SRMIST_VDP_Timetable_{department}_Sem{semester}.pdf",
+                file_name=f"SRMIST_VDP_University_Timetable_Sem{semester}.pdf",
                 mime="application/pdf",
                 use_container_width=True
             )

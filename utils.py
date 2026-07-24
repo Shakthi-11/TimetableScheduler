@@ -1,4 +1,5 @@
 import io
+import re
 import pandas as pd
 from fpdf import FPDF
 
@@ -11,7 +12,6 @@ def sanitize_pdf_text(text):
         return ""
     text = str(text)
     
-    # Replace common unicode typography symbols with standard equivalents
     replacements = {
         '–': '-', '—': '-', '’': "'", '‘': "'",
         '“': '"', '”': '"', '…': '...', '•': '*'
@@ -19,47 +19,138 @@ def sanitize_pdf_text(text):
     for orig, repl in replacements.items():
         text = text.replace(orig, repl)
         
-    # Strictly filter string to Latin-1 encoding compatible characters
     return text.encode('latin-1', 'ignore').decode('latin-1')
 
-def export_to_pdf(timetable_df, department="B.Tech CS", semester="4"):
+def export_to_pdf(timetable_df_or_dict, department="Institutional ERP", semester="4", global_matrix=None):
+    """
+    Generates a formal PDF report.
+    Supports either a single department DataFrame or a dictionary of multi-department DataFrames.
+    Optionally appends faculty master schedule overview pages.
+    """
     pdf = FPDF(orientation='L', unit='mm', format='A4')
-    pdf.add_page()
-    pdf.set_auto_page_break(auto=True, margin=15)
     
-    # Header Format (Exact original layout)
-    pdf.set_font("Helvetica", 'B', 16)
-    title = sanitize_pdf_text(f"SRMIST Vadapalani - {department} (Semester {semester})")
-    pdf.cell(0, 10, title, ln=True, align='C')
-    
-    pdf.set_font("Helvetica", 'I', 11)
-    pdf.cell(0, 6, "Official Class Timetable", ln=True, align='C')
-    pdf.ln(6)
-    
-    # Table Width Calculations
-    num_cols = len(timetable_df.columns) + 1
-    page_width = 270
-    col_width = page_width / num_cols
-    
-    # Table Header Row
-    pdf.set_font("Helvetica", 'B', 9)
-    pdf.cell(col_width, 10, "Day / Hour", border=1, align='C')
-    for col in timetable_df.columns:
-        pdf.cell(col_width, 10, sanitize_pdf_text(col), border=1, align='C')
-    pdf.ln()
-    
-    # Table Data Rows
-    pdf.set_font("Helvetica", '', 8)
-    for day, row in timetable_df.iterrows():
-        pdf.cell(col_width, 12, sanitize_pdf_text(day), border=1, align='C')
-        for cell in row:
-            pdf.cell(col_width, 12, sanitize_pdf_text(cell), border=1, align='C')
+    if isinstance(timetable_df_or_dict, pd.DataFrame):
+        dept_dict = {department: timetable_df_or_dict}
+    elif isinstance(timetable_df_or_dict, dict):
+        dept_dict = timetable_df_or_dict
+    else:
+        dept_dict = {}
+
+    for dept_name, df in dept_dict.items():
+        pdf.add_page()
+        pdf.set_auto_page_break(auto=True, margin=15)
+        
+        # Header Format
+        pdf.set_font("Helvetica", 'B', 16)
+        title = sanitize_pdf_text(f"SRMIST Vadapalani - {dept_name} (Semester {semester})")
+        pdf.cell(0, 10, title, ln=True, align='C')
+        
+        pdf.set_font("Helvetica", 'I', 11)
+        pdf.cell(0, 6, "Official Institutional Class Timetable", ln=True, align='C')
+        pdf.ln(6)
+        
+        # Table Width Calculations
+        num_cols = len(df.columns) + 1
+        page_width = 270
+        col_width = page_width / num_cols
+        
+        # Table Header Row
+        pdf.set_font("Helvetica", 'B', 9)
+        pdf.cell(col_width, 10, "Day / Hour", border=1, align='C')
+        for col in df.columns:
+            pdf.cell(col_width, 10, sanitize_pdf_text(col), border=1, align='C')
         pdf.ln()
         
+        # Table Data Rows
+        pdf.set_font("Helvetica", '', 8)
+        for day, row in df.iterrows():
+            pdf.cell(col_width, 12, sanitize_pdf_text(day), border=1, align='C')
+            for cell in row:
+                pdf.cell(col_width, 12, sanitize_pdf_text(cell), border=1, align='C')
+            pdf.ln()
+
+    # Append Global Faculty Schedules if provided
+    if global_matrix and hasattr(global_matrix, 'faculty_ids'):
+        for fac_id in sorted(list(global_matrix.faculty_ids)):
+            fac_df = global_matrix.to_dataframe(fac_id)
+            if fac_df.empty:
+                continue
+            pdf.add_page()
+            pdf.set_font("Helvetica", 'B', 14)
+            pdf.cell(0, 10, sanitize_pdf_text(f"Master Faculty Schedule: Prof./Dr. {fac_id}"), ln=True, align='C')
+            pdf.set_font("Helvetica", 'I', 10)
+            pdf.cell(0, 6, "Cross-Department Assignment Matrix", ln=True, align='C')
+            pdf.ln(4)
+
+            num_cols = len(fac_df.columns) + 1
+            col_width = 270 / num_cols
+
+            pdf.set_font("Helvetica", 'B', 9)
+            pdf.cell(col_width, 10, "Day / Hour", border=1, align='C')
+            for col in fac_df.columns:
+                pdf.cell(col_width, 10, sanitize_pdf_text(col), border=1, align='C')
+            pdf.ln()
+
+            pdf.set_font("Helvetica", '', 8)
+            for day, row in fac_df.iterrows():
+                pdf.cell(col_width, 12, sanitize_pdf_text(day), border=1, align='C')
+                for cell in row:
+                    pdf.cell(col_width, 12, sanitize_pdf_text(cell), border=1, align='C')
+                pdf.ln()
+
     return bytes(pdf.output())
 
-def export_to_excel(timetable_df):
+def export_to_excel(timetable_df_or_dict, global_matrix=None, metrics=None):
+    """
+    Exports timetables to a multi-sheet Excel workbook.
+    Supports single DataFrame or dictionary of department DataFrames, plus master matrix.
+    Guarantees unique, valid sheet names and at least one visible sheet.
+    """
     output = io.BytesIO()
+    sheets_written = set()
+
+    def get_unique_sheet_name(name):
+        clean = re.sub(r'[\:\\/\?\*\[\]]', '_', str(name)).strip()
+        if not clean:
+            clean = "Sheet"
+        clean = clean[:31]
+        base_name = clean
+        counter = 1
+        while clean.lower() in sheets_written:
+            suffix = f"_{counter}"
+            clean = f"{base_name[:31 - len(suffix)]}{suffix}"
+            counter += 1
+        sheets_written.add(clean.lower())
+        return clean
+
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        timetable_df.to_excel(writer, sheet_name="Timetable")
+        if isinstance(timetable_df_or_dict, pd.DataFrame):
+            s_name = get_unique_sheet_name("Timetable")
+            timetable_df_or_dict.to_excel(writer, sheet_name=s_name)
+        elif isinstance(timetable_df_or_dict, dict) and timetable_df_or_dict:
+            for dept_name, df in timetable_df_or_dict.items():
+                s_name = get_unique_sheet_name(dept_name)
+                df.to_excel(writer, sheet_name=s_name)
+
+        if global_matrix and hasattr(global_matrix, 'faculty_ids'):
+            for fac_id in sorted(list(global_matrix.faculty_ids)):
+                fac_df = global_matrix.to_dataframe(fac_id)
+                if not fac_df.empty:
+                    s_name = get_unique_sheet_name(f"Faculty_{fac_id}")
+                    fac_df.to_excel(writer, sheet_name=s_name)
+
+        if metrics:
+            summary_rows = [
+                {"Metric": "Total Departments", "Value": metrics.get("total_departments", 1)},
+                {"Metric": "Total Faculty Tracked", "Value": metrics.get("total_faculty", 0)},
+                {"Metric": "Total Allocated Operating Hours", "Value": metrics.get("total_allocated_slots", 0)},
+            ]
+            s_name = get_unique_sheet_name("Institutional Diagnostics")
+            pd.DataFrame(summary_rows).to_excel(writer, sheet_name=s_name, index=False)
+
+        # Safeguard fallback: if no sheet has been written, write a default summary sheet
+        if not sheets_written:
+            s_name = get_unique_sheet_name("Summary")
+            pd.DataFrame([{"Status": "No Timetable Data Available"}]).to_excel(writer, sheet_name=s_name, index=False)
+
     return output.getvalue()
