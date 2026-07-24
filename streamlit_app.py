@@ -3,49 +3,43 @@ import streamlit as st
 from scheduler import generate_timetable
 from utils import export_to_excel, export_to_pdf
 
-# 1. PROFESSIONAL PAGE SETUP
+# 1. PAGE SETUP (Sidebar Collapsed/Hidden)
 st.set_page_config(
     page_title="SRMIST Vadapalani - Timetable Scheduler",
     page_icon="📅",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed"
 )
 
-# OFFICIAL INSTUITIONAL COLOR PALETTE (Light Theme, Blue & Gold Accent)
+# 2. BRANDING COLORS & SINGLE LOGO URL
 SRM_BLUE = "#003366"
 SRM_GOLD = "#ffcc00"
-# (Used sparingly forVadipalani text)
-VDP_RED = "#cc3333" 
+VDP_RED = "#cc3333"
 
-# 2. LOGO AND ASSET DEFINITIONS
-# Sidebar: Large circular logo
-SRM_SIDEBAR_LOGO_URL = "https://www.srmistvdp.edu.in/uploads/51ba570fe68fc088e0a942bdf8700cdce7eb8b1d/1766992169SRMIST-Vadapalani.webp"
-# Main Header: Stylized text logo as seen in image_7.png, used for the main institutional banner
-SRM_HEADER_LOGO_URL = SRM_SIDEBAR_LOGO_URL # Use same official logo url, will style text
+SRM_LOGO_URL = "https://www.srmistvdp.edu.in/uploads/51ba570fe68fc088e0a942bdf8700cdce7eb8b1d/1766992169SRMIST-Vadapalani.webp"
 
-# 3. ADVANCED PROFESSIONAL CUSTOM CSS
+# 3. PROFESSIONAL CUSTOM CSS
 st.markdown(f"""
 <style>
-    /* Uniform professional font across app */
+    /* Hide Streamlit Sidebar Completely */
+    [data-testid="stSidebar"] {{
+        display: none !important;
+    }}
+    
+    /* Font & Global Styling */
     * {{
         font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif !important;
     }}
     
-    /* Overall page padding */
     .block-container {{
-        padding: 2.5rem 3.5rem !important;
+        padding: 2rem 4rem !important;
+        max-width: 100% !important;
     }}
     
-    /* Clean, non-translucent Sidebar background */
-    [data-testid="stSidebar"] {{
-        background-color: #ffffff !important;
-        border-right: 1px solid #e0e0e0;
-    }}
-    
-    /* Professional Institutional Header Banner */
+    /* Header Banner with Single Logo */
     .srm-banner-card {{
         background: linear-gradient(135deg, {SRM_BLUE} 0%, #001a33 100%);
-        padding: 2rem 3rem;
+        padding: 1.75rem 2.5rem;
         border-radius: 12px;
         color: white;
         margin-bottom: 2rem;
@@ -56,7 +50,8 @@ st.markdown(f"""
         color: #ffffff !important;
         font-weight: 700 !important;
         margin-top: 0 !important;
-        margin-bottom: 0.5rem !important;
+        margin-bottom: 0.3rem !important;
+        font-size: 2.2rem !important;
     }}
     
     .srm-banner-card p {{
@@ -65,55 +60,39 @@ st.markdown(f"""
         margin: 0 !important;
     }}
     
-    /* Customized Vadapalani Text Logo Text with red color and alignment */
     .vdp-header-text {{
-        font-size: 1.1rem;
+        font-size: 1rem;
         color: {VDP_RED};
-        font-weight: 600;
+        font-weight: 700;
         letter-spacing: 0.5px;
     }}
 
-    /* Professional Sidebar Info Box (Styled clean shield icon) */
-    .sidebar-info-box {{
-        background-color: #f0f7fc;
-        padding: 1rem 1.25rem;
-        border-radius: 8px;
-        border: 1px solid {SRM_BLUE};
-        margin-bottom: 1.5rem;
-    }}
-    
-    .sidebar-info-box .icon {{
-        color: {SRM_BLUE};
-        font-size: 1.2rem;
-        margin-right: 0.5rem;
-    }}
-    
-    /* Custom Styling for Subject Input Cards */
+    /* Card Container Styling for Subject Inputs */
     .subject-input-card {{
         background-color: #ffffff;
-        padding: 1.5rem;
+        padding: 1.25rem 1.5rem;
         border-radius: 8px;
         border: 1px solid #e0e0e0;
         border-left: 5px solid {SRM_BLUE};
         margin-bottom: 1rem;
-        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.04);
     }}
     
-    /* Section and Subheader typography refinement */
+    /* Headers & Typography */
     h3, h4 {{
         color: {SRM_BLUE} !important;
         font-weight: 600 !important;
         margin-top: 1rem !important;
     }}
     
-    /* Clean metric cards with SRM colors */
+    /* Metric Cards */
     [data-testid="stMetricValue"] {{
         color: {SRM_BLUE};
         font-weight: 700;
     }}
     
     /* Branded Primary Buttons */
-    .stButton>button[type="submit"], .stButton>button[type="button"]{{
+    .stButton>button[type="submit"], .stButton>button[type="button"] {{
         background-color: {SRM_BLUE} !important;
         color: white !important;
         border-radius: 8px !important;
@@ -128,55 +107,25 @@ st.markdown(f"""
         box-shadow: 0 4px 10px rgba(0,0,0,0.2) !important;
         transform: translateY(-2px);
     }}
-    
-    /* Style dataframes for better data viz */
-    .stDataFrame table {{
-        border-collapse: collapse;
-    }}
-    
-    .stDataFrame th {{
-        background-color: {SRM_BLUE} !important;
-        color: white !important;
-        text-align: center;
-        border-color: #e0e0e0 !important;
-    }}
-    
-    .stDataFrame td {{
-        text-align: center;
-        border-color: #e0e0e0 !important;
-    }}
 </style>
 """, unsafe_allow_html=True)
 
-# 4. SIDEBAR BRANDING & INFO
-st.sidebar.image(SRM_SIDEBAR_LOGO_URL, use_container_width=True)
-st.sidebar.markdown("---")
-st.sidebar.subheader("📌 Application Profile")
-st.sidebar.markdown("""
-<div class="sidebar-info-box">
-    <p><span class="icon">🏫</span> SRMIST Vadapalani</p>
-    <p><span class="icon">🛡️</span> Departmental Utility</p>
-    <p><span class="icon">📅</span> Automated Scheduler</p>
-    <p>Ensures optimal slot distribution and constraint validation.</p>
-</div>
-""", unsafe_allow_html=True)
-
-# 5. PROFESSIONAL HEADER BANNER (As seen in image_7.png layout, but styled)
+# 4. HEADER BANNER (ONE SINGLE LOGO INTEGRATED)
 st.markdown(f"""
 <div class="srm-banner-card">
-    <div style="display: flex; align-items: center;">
-        <div style="flex: 0 0 100px; margin-right: 1.5rem;">
-            <img src="{SRM_SIDEBAR_LOGO_URL}" width="95px">
+    <div style="display: flex; align-items: center; gap: 1.5rem;">
+        <div>
+            <img src="{SRM_LOGO_URL}" width="90px" style="border-radius: 6px; background: white; padding: 4px;">
         </div>
         <div>
-            <h1>Timetable Scheduler Dashboard</h1>
-            <p>A smart, constraint-based scheduling tool for <span class="vdp-header-text">VADAPALANI</span> campus departments.</p>
+            <h1>Smart Timetable Scheduler</h1>
+            <p>SRM Institute of Science and Technology • <span class="vdp-header-text">VADAPALANI</span> Campus</p>
         </div>
     </div>
 </div>
 """, unsafe_allow_html=True)
 
-# 6. UNIFIED NAVIGATION TABS (Removed stock emojis for a cleaner look)
+# 5. MAIN NAVIGATION TABS
 tab1, tab2 = st.tabs(["Setup & Configuration", "Live Timetable & Metrics"])
 
 with tab1:
@@ -199,16 +148,15 @@ with tab1:
         num_subjects = st.number_input("Count of Subjects / Labs", min_value=1, max_value=15, value=5)
 
     subject_data = []
-    # Style each subject entry as a professional 'input card'
     for i in range(num_subjects):
         st.markdown(f"#### Subject {i+1} Details")
-        st.markdown(f'<div class="subject-input-card">', unsafe_allow_html=True)
+        st.markdown('<div class="subject-input-card">', unsafe_allow_html=True)
         col1, col2, col3, col4 = st.columns(4)
 
         with col1:
             subject = st.text_input("Course Code / Name", key=f"subject_{i}", value=f"Course {i+1}")
         with col2:
-            faculty = st.text_input("Assigned Faculty (Icon hint)", key=f"faculty_{i}", value=f"Prof. {chr(65+i)}")
+            faculty = st.text_input("Assigned Faculty", key=f"faculty_{i}", value=f"Prof. {chr(65+i)}")
         with col3:
             hours = st.number_input("Weekly Contact Hours", 1, 10, 4 if i % 2 == 0 else 2, key=f"hours_{i}")
         with col4:
@@ -230,10 +178,8 @@ with tab1:
             with f_cols[idx % len(f_cols)]:
                 st.write(f"👤 **Constraint: {fac}**")
                 faculty_availability[fac] = {}
-                # Professional grid for availability
-                inner_days_col1, inner_days_col2 = st.columns([1,1])
+                inner_days_col1, inner_days_col2 = st.columns([1, 1])
                 for day_idx, day in enumerate(days_list):
-                    # Alternate columns for day checkboxes
                     current_col = inner_days_col1 if day_idx % 2 == 0 else inner_days_col2
                     with current_col:
                         faculty_availability[fac][day] = st.checkbox(f"{day}", value=True, key=f"{fac}_{day}")
@@ -242,7 +188,7 @@ with tab2:
     if st.button("Generate Smart Institutional Timetable", type="primary", use_container_width=True):
         timetable, conflicts = generate_timetable(subject_data, working_days, hours_per_day, faculty_availability)
 
-        # 7. PROFESSIONAL DASHBOARD METRICS
+        # Dashboard Metrics
         m1, m2, m3 = st.columns(3)
         total_slots = working_days * hours_per_day
         assigned_slots = (timetable != "FREE").sum().sum()
@@ -254,7 +200,7 @@ with tab2:
         with m3:
             st.metric(label="⏳ Remaining FREE Slots", value=total_slots - assigned_slots, help="Available free hours in the schedule")
 
-        # 8. REFINED CONFLICT PANEL
+        # Conflict Detection
         st.divider()
         st.markdown("<h3>⚠️ Multi-Level Conflict Detection Panel</h3>", unsafe_allow_html=True)
         if conflicts:
@@ -277,11 +223,11 @@ with tab2:
             </div>
             """, unsafe_allow_html=True)
 
-        # 9. REFINED TIMETABLE GRID viz
+        # Timetable Matrix
         st.markdown("<h3>🗓️ Generated Optimized Timetable Matrix</h3>", unsafe_allow_html=True)
         st.dataframe(timetable, use_container_width=True)
 
-        # 10. REFINED EXPORT TOOLBAR
+        # Export Utility
         st.divider()
         st.markdown("<h3>📥 Branded Export Utility (PDF & Excel)</h3>", unsafe_allow_html=True)
 
