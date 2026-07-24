@@ -178,7 +178,7 @@ with tab1:
     st.subheader("1. Department Institutional Settings")
     c1, c2, c3, c4 = st.columns(4)
     with c1:
-        department = st.text_input("Department Profile", "B.Tech Computer Science")
+        department = st.text_input("Department Profile", " ")
     with c2:
         semester = st.selectbox("Current Semester", [1, 2, 3, 4, 5, 6, 7, 8], index=3)
     with c3:
@@ -191,7 +191,7 @@ with tab1:
     
     num_subjects_col1, num_subjects_col2 = st.columns([1, 4])
     with num_subjects_col1:
-        num_subjects = st.number_input("Count of Subjects / Labs", min_value=1, max_value=15, value=5)
+        num_subjects = st.number_input("Count of Subjects / Labs", min_value=1, max_value=15, value=4)
 
     subject_data = []
     for i in range(num_subjects):
