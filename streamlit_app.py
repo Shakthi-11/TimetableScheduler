@@ -3,11 +3,81 @@ import streamlit as st
 from scheduler import generate_timetable
 from utils import export_to_excel, export_to_pdf
 
-st.set_page_config(page_title="Smart Timetable Scheduler", page_icon="🎓", layout="wide")
+# 1. Page Configuration
+st.set_page_config(
+    page_title="SRMIST Vadapalani - Timetable Scheduler",
+    page_icon="🎓",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
-st.title("🎓 Smart Timetable Scheduler")
-st.caption("Automated class scheduling with lab consecutive allocation & conflict detection")
+# 2. Official SRMIST Vadapalani Logo URL
+SRM_LOGO_URL = "https://www.srmistvdp.edu.in/uploads/51ba570fe68fc088e0a942bdf8700cdce7eb8b1d/1766992169SRMIST-Vadapalani.webp"
 
+# 3. Custom CSS for SRM Branding (Navy Blue & Gold Accents)
+st.markdown("""
+<style>
+    /* SRM Deep Navy Blue Header Banner */
+    .srm-banner {
+        background: linear-gradient(135deg, #003366 0%, #001a33 100%);
+        padding: 1.25rem 1.75rem;
+        border-radius: 12px;
+        color: white;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.12);
+    }
+    .srm-banner h1 {
+        color: #ffffff !important;
+        font-size: 2rem !important;
+        font-weight: 700 !important;
+        margin: 0 !important;
+    }
+    .srm-banner p {
+        color: #ffcc00 !important;
+        font-size: 0.95rem !important;
+        margin-top: 4px !important;
+        margin-bottom: 0 !important;
+    }
+    /* Card Container Styling for Subject Inputs */
+    .subject-card {
+        background-color: #f8f9fa;
+        padding: 1rem;
+        border-radius: 8px;
+        border-left: 4px solid #003366;
+        margin-bottom: 0.75rem;
+    }
+    /* Style Primary Buttons */
+    .stButton>button {
+        border-radius: 8px !important;
+        font-weight: 600 !important;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# 4. Sidebar Branding
+st.sidebar.image(SRM_LOGO_URL, use_container_width=True)
+st.sidebar.markdown("---")
+st.sidebar.subheader("📌 About Application")
+st.sidebar.info(
+    "Automated timetable generation system for SRMIST Vadapalani. "
+    "Handles lab consecutive allocations, faculty availability, and conflict detection."
+)
+
+# 5. Header Section with Logo
+col_logo, col_header = st.columns([1, 5])
+
+with col_logo:
+    st.image(SRM_LOGO_URL, width=130)
+
+with col_header:
+    st.markdown("""
+        <div class="srm-banner">
+            <h1>🎓 Smart Timetable Scheduler</h1>
+            <p>SRM Institute of Science and Technology • Vadapalani Campus</p>
+        </div>
+    """, unsafe_allow_html=True)
+
+# 6. Navigation Tabs
 tab1, tab2 = st.tabs(["📝 Setup & Input", "📊 Dashboard & Schedule"])
 
 with tab1:
@@ -29,7 +99,7 @@ with tab1:
 
     subject_data = []
     for i in range(num_subjects):
-        st.markdown(f"**Subject {i+1}**")
+        st.markdown(f"##### Subject {i+1}")
         col1, col2, col3, col4 = st.columns(4)
 
         with col1:
@@ -59,7 +129,7 @@ with tab1:
                     faculty_availability[fac][day] = st.checkbox(f"{day}", value=True, key=f"{fac}_{day}")
 
 with tab2:
-    if st.button("🚀 Generate Smart Timetable", type="primary"):
+    if st.button("🚀 Generate Smart Timetable", type="primary", use_container_width=True):
         timetable, conflicts = generate_timetable(subject_data, working_days, hours_per_day, faculty_availability)
 
         # Top Metrics
@@ -94,6 +164,7 @@ with tab2:
                 data=excel_bytes,
                 file_name=f"Timetable_{department}_Sem{semester}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True
             )
 
         with col_ex2:
@@ -103,4 +174,5 @@ with tab2:
                 data=pdf_bytes,
                 file_name=f"Timetable_{department}_Sem{semester}.pdf",
                 mime="application/pdf",
+                use_container_width=True
             )
