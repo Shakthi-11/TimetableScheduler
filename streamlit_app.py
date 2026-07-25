@@ -170,8 +170,8 @@ if "faculty_registry_data" not in st.session_state:
     st.session_state.faculty_registry_data = [
         {"Faculty_ID": "MR", "Name": "Prof. MR", "Primary_Dept": "B.sc CS", "Qualified": "Python, Python Lab, AI", "Max_Daily": 4, "Max_Cons": 2},
         {"Faculty_ID": "VR", "Name": "Prof. VR", "Primary_Dept": "B.sc CS", "Qualified": "ML, ML Lab, Data Mining", "Max_Daily": 4, "Max_Cons": 2},
-        {"Faculty_ID": "JP", "Name": "Dr. JP", "Primary_Dept": "BCA", "Qualified": "Project-c, Ethics, Signals", "Max_Daily": 4, "Max_Cons": 2},
-        {"Faculty_ID": "JPS", "Name": "Prof. JPS", "Primary_Dept": "BCA", "Qualified": "Signals, Systems, Project-OOPS", "Max_Daily": 4, "Max_Cons": 2},
+        {"Faculty_ID": "JP", "Name": "Dr. JP", "Primary_Dept": "BCA", "Qualified": "Project-c, Ethics, Signals & Systems", "Max_Daily": 4, "Max_Cons": 2},
+        {"Faculty_ID": "JPS", "Name": "Prof. JPS", "Primary_Dept": "BCA", "Qualified": "Signals & Systems, Signals, Systems, Project-OOPS", "Max_Daily": 4, "Max_Cons": 2},
     ]
 
 if "depts_curriculum" not in st.session_state:
@@ -271,12 +271,44 @@ with tab_depts:
         
         dept_df = pd.DataFrame(curr_list) if curr_list else pd.DataFrame(columns=["Subject", "Faculty", "Hours", "Type", "Category"])
         
+        # 1. Convert Staff Registry into DataFrame
+        staff_registry_df = pd.DataFrame(st.session_state.faculty_registry_data)
+        
+        # 2. Extract qualified subjects strictly mapped to currently selected department
+        dept_qualified_subjects = []
+        if not staff_registry_df.empty:
+            dept_col = "Primary_Dept" if "Primary_Dept" in staff_registry_df.columns else "Primary Department"
+            qual_col = "Qualified" if "Qualified" in staff_registry_df.columns else "Qualified Subjects (Comma-Separated)"
+            
+            if dept_col in staff_registry_df.columns and qual_col in staff_registry_df.columns:
+                # Filter staff registry strictly for faculty matching selected_dept
+                dept_staff = staff_registry_df[
+                    staff_registry_df[dept_col].astype(str).str.strip().str.lower() == selected_dept.strip().lower()
+                ]
+                # Extract and split comma-separated strings
+                for qual_str in dept_staff[qual_col].dropna().astype(str):
+                    for subj in qual_str.split(","):
+                        subj_clean = subj.strip()
+                        if subj_clean and subj_clean not in dept_qualified_subjects:
+                            dept_qualified_subjects.append(subj_clean)
+
+        # Preserve existing subjects already in department curriculum dataframe if any
+        if not dept_df.empty and "Subject" in dept_df.columns:
+            for s in dept_df["Subject"].dropna().tolist():
+                s_clean = str(s).strip()
+                if s_clean and s_clean not in dept_qualified_subjects:
+                    dept_qualified_subjects.append(s_clean)
+
         edited_dept_df = st.data_editor(
             dept_df,
             num_rows="dynamic",
             use_container_width=True,
             column_config={
-                "Subject": st.column_config.TextColumn("Course Code / Name", required=True),
+                "Subject": st.column_config.SelectboxColumn(
+                    "Course Code / Name", 
+                    options=dept_qualified_subjects, 
+                    required=True
+                ),
                 "Faculty": st.column_config.SelectboxColumn("Assigned Faculty", options=available_faculties, required=True),
                 "Hours": st.column_config.NumberColumn("Weekly Contact Hours", min_value=1, max_value=10, default=3),
                 "Type": st.column_config.SelectboxColumn("Type", options=["Theory", "Lab"], default="Theory"),
