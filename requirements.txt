@@ -4,3 +4,6 @@ numpy
 openpyxl
 reportlab
 fpdf2
+fastapi
+uvicorn
+pydantic
