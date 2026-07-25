@@ -170,8 +170,8 @@ if "faculty_registry_data" not in st.session_state:
     st.session_state.faculty_registry_data = [
         {"Faculty_ID": "MR", "Name": "Prof. MR", "Primary_Dept": "B.sc CS", "Qualified": "Python, Python Lab, AI", "Max_Daily": 4, "Max_Cons": 2},
         {"Faculty_ID": "VR", "Name": "Prof. VR", "Primary_Dept": "B.sc CS", "Qualified": "ML, ML Lab, Data Mining", "Max_Daily": 4, "Max_Cons": 2},
-        {"Faculty_ID": "JP", "Name": "Dr. JP", "Primary_Dept": "BCA", "Qualified": "Project-c, Ethics, Signals & Systems", "Max_Daily": 4, "Max_Cons": 2},
-        {"Faculty_ID": "JPS", "Name": "Prof. JPS", "Primary_Dept": "BCA", "Qualified": "Signals & Systems, Signals, Systems, Project-OOPS", "Max_Daily": 4, "Max_Cons": 2},
+        {"Faculty_ID": "JP", "Name": "Dr. JP", "Primary_Dept": "BCA", "Qualified": "Project-c, Ethics, Signals", "Max_Daily": 4, "Max_Cons": 2},
+        {"Faculty_ID": "JPS", "Name": "Prof. JPS", "Primary_Dept": "BCA", "Qualified": "Signals, Systems, Project-OOPS", "Max_Daily": 4, "Max_Cons": 2},
     ]
 
 if "depts_curriculum" not in st.session_state:
@@ -271,29 +271,12 @@ with tab_depts:
         
         dept_df = pd.DataFrame(curr_list) if curr_list else pd.DataFrame(columns=["Subject", "Faculty", "Hours", "Type", "Category"])
         
-        # Extract unique qualified subjects for the currently selected department from Staff Registry
-        dept_qualified_subjects = []
-        for f in st.session_state.faculty_registry_data:
-            f_dept = str(f.get("Primary_Dept", "")).strip()
-            if f_dept.lower() == selected_dept.strip().lower():
-                quals = [q.strip() for q in str(f.get("Qualified", "")).split(",") if q.strip()]
-                for q in quals:
-                    if q not in dept_qualified_subjects:
-                        dept_qualified_subjects.append(q)
-
-        # Preserve any existing subjects in the department dataframe
-        if not dept_df.empty and "Subject" in dept_df.columns:
-            for s in dept_df["Subject"].dropna().tolist():
-                s_clean = str(s).strip()
-                if s_clean and s_clean not in dept_qualified_subjects:
-                    dept_qualified_subjects.append(s_clean)
-
         edited_dept_df = st.data_editor(
             dept_df,
             num_rows="dynamic",
             use_container_width=True,
             column_config={
-                "Subject": st.column_config.SelectboxColumn("Course Code / Name", options=dept_qualified_subjects, required=True),
+                "Subject": st.column_config.TextColumn("Course Code / Name", required=True),
                 "Faculty": st.column_config.SelectboxColumn("Assigned Faculty", options=available_faculties, required=True),
                 "Hours": st.column_config.NumberColumn("Weekly Contact Hours", min_value=1, max_value=10, default=3),
                 "Type": st.column_config.SelectboxColumn("Type", options=["Theory", "Lab"], default="Theory"),
