@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { FacultyMember, SubjectData, OperatingRules } from '../types';
-import { Building, Plus, Trash2, Edit3, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Building, Plus, Trash2, Edit2, Calendar, Clock, Utensils, BookOpen, CheckCircle, AlertCircle } from 'lucide-react';
 
 interface Tab2Props {
   operatingRules: OperatingRules;
@@ -29,10 +29,8 @@ export const Tab2DepartmentCurriculum: React.FC<Tab2Props> = ({
   const deptNames = Object.keys(deptsCurriculum);
   const currentCurriculum = deptsCurriculum[selectedDept] || [];
 
-  // Available faculties for dropdown
   const availableFaculties = facultyData.map((f) => f.Faculty_ID).filter(Boolean);
 
-  // Extract qualified subjects for selected department from staff registry
   const deptQualifiedSubjects: string[] = [];
   facultyData.forEach((f) => {
     if (f.Primary_Dept.trim().toLowerCase() === selectedDept.trim().toLowerCase()) {
@@ -45,17 +43,14 @@ export const Tab2DepartmentCurriculum: React.FC<Tab2Props> = ({
     }
   });
 
-  // Also include existing subjects in curriculum if any
   currentCurriculum.forEach((s) => {
     if (s.Subject.trim() && !deptQualifiedSubjects.includes(s.Subject.trim())) {
       deptQualifiedSubjects.push(s.Subject.trim());
     }
   });
 
-  // Calculate capacity gauge metrics
   const totalConfiguredHours = currentCurriculum.reduce((acc, curr) => acc + (Number(curr.Hours) || 0), 0);
-  const breakSlotCount = operatingRules.break_option !== 'None' ? 1 : 0;
-  const maxDeptCapacity = operatingRules.working_days * (operatingRules.hours_per_day - breakSlotCount);
+  const maxDeptCapacity = operatingRules.working_days * operatingRules.hours_per_day;
   const capacityPercent = maxDeptCapacity > 0 ? Math.min(100, Math.round((totalConfiguredHours / maxDeptCapacity) * 100)) : 0;
   const isOverCapacity = totalConfiguredHours > maxDeptCapacity;
 
@@ -141,79 +136,113 @@ export const Tab2DepartmentCurriculum: React.FC<Tab2Props> = ({
 
   return (
     <div className="glass-card">
-      <h2><Building style={{ display: 'inline', marginRight: '8px' }} /> 2. Institutional Operating Rules & Department Curriculums</h2>
-      
-      {/* Operating Parameters Controls */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.2rem', margin: '1.5rem 0' }}>
-        <div>
-          <label style={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 600 }}>Weekly Working Days</label>
-          <input
-            type="number"
-            min={1}
-            max={7}
-            value={operatingRules.working_days}
-            onChange={(e) => setOperatingRules({ ...operatingRules, working_days: parseInt(e.target.value) || 4 })}
-          />
+      <div className="card-header-title">
+        <Building size={18} color="#60a5fa" /> Institutional Operating Rules & Department Curriculums
+      </div>
+      <p className="card-subtitle">
+        Configure institutional rules and manage department-wise curriculum and workload.
+      </p>
+
+      {/* 4 Operating Rule Metric Cards */}
+      <div className="rules-grid">
+        <div className="rule-card">
+          <div className="stat-icon-wrapper blue">
+            <Calendar size={16} />
+          </div>
+          <div className="stat-info">
+            <div className="stat-label">Weekly Working Days</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
+              <input
+                type="number"
+                min={1}
+                max={7}
+                value={operatingRules.working_days}
+                onChange={(e) => setOperatingRules({ ...operatingRules, working_days: parseInt(e.target.value) || 5 })}
+                style={{ width: '50px', padding: '2px 4px', fontSize: '0.9rem', fontWeight: 700 }}
+              />
+              <span style={{ fontSize: '0.85rem', color: '#ffffff', fontWeight: 700 }}>Days</span>
+            </div>
+          </div>
         </div>
-        <div>
-          <label style={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 600 }}>Daily Operating Hours</label>
-          <input
-            type="number"
-            min={1}
-            max={10}
-            value={operatingRules.hours_per_day}
-            onChange={(e) => setOperatingRules({ ...operatingRules, hours_per_day: parseInt(e.target.value) || 6 })}
-          />
+
+        <div className="rule-card">
+          <div className="stat-icon-wrapper blue">
+            <Clock size={16} />
+          </div>
+          <div className="stat-info">
+            <div className="stat-label">Daily Operating Hours</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
+              <input
+                type="number"
+                min={1}
+                max={10}
+                value={operatingRules.hours_per_day}
+                onChange={(e) => setOperatingRules({ ...operatingRules, hours_per_day: parseInt(e.target.value) || 6 })}
+                style={{ width: '50px', padding: '2px 4px', fontSize: '0.9rem', fontWeight: 700 }}
+              />
+              <span style={{ fontSize: '0.8rem', color: '#ffffff', fontWeight: 700 }}>Hours / Day</span>
+            </div>
+          </div>
         </div>
-        <div>
-          <label style={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 600 }}>Institutional Lunch Break Slot</label>
-          <select
-            value={operatingRules.break_option}
-            onChange={(e) => setOperatingRules({ ...operatingRules, break_option: e.target.value as any })}
-          >
-            <option value="None">None</option>
-            <option value="Hour IV (Lunch)">Hour IV (Lunch)</option>
-            <option value="Hour III (Lunch)">Hour III (Lunch)</option>
-          </select>
+
+        <div className="rule-card">
+          <div className="stat-icon-wrapper blue">
+            <Utensils size={16} />
+          </div>
+          <div className="stat-info">
+            <div className="stat-label">Lunch Break Slot</div>
+            <select
+              value="None"
+              disabled
+              style={{ padding: '2px 4px', fontSize: '0.8rem', marginTop: '2px', fontWeight: 700, opacity: 0.9 }}
+            >
+              <option value="None">None</option>
+            </select>
+          </div>
         </div>
-        <div>
-          <label style={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 600 }}>Current Semester</label>
-          <select
-            value={operatingRules.semester}
-            onChange={(e) => setOperatingRules({ ...operatingRules, semester: parseInt(e.target.value) || 4 })}
-          >
-            {[1, 2, 3, 4, 5, 6, 7, 8].map((s) => (
-              <option key={s} value={s}>Semester {s}</option>
-            ))}
-          </select>
+
+        <div className="rule-card">
+          <div className="stat-icon-wrapper blue">
+            <BookOpen size={16} />
+          </div>
+          <div className="stat-info">
+            <div className="stat-label">Current Semester</div>
+            <select
+              value={operatingRules.semester}
+              onChange={(e) => setOperatingRules({ ...operatingRules, semester: parseInt(e.target.value) || 4 })}
+              style={{ padding: '2px 4px', fontSize: '0.8rem', marginTop: '2px', fontWeight: 700 }}
+            >
+              {[1, 2, 3, 4, 5, 6, 7, 8].map((s) => (
+                <option key={s} value={s}>Semester {s}</option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 
-      <hr style={{ borderColor: 'var(--border-glass)', margin: '1.8rem 0' }} />
-
       {/* Department Selector & Management Bar */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <label style={{ fontWeight: 700, color: 'var(--cyan-accent)' }}>Select Department:</label>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.8rem', flexWrap: 'wrap', gap: '0.6rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <label style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-muted)' }}>Select Department</label>
           {!isRenaming ? (
             <select
               value={selectedDept}
               onChange={(e) => setSelectedDept(e.target.value)}
-              style={{ width: '220px', fontWeight: 700 }}
+              style={{ width: '180px', fontWeight: 700 }}
             >
               {deptNames.map((name) => (
                 <option key={name} value={name}>{name}</option>
               ))}
             </select>
           ) : (
-            <div style={{ display: 'flex', gap: '6px' }}>
+            <div style={{ display: 'flex', gap: '4px' }}>
               <input
                 type="text"
                 value={renameInput}
                 onChange={(e) => setRenameInput(e.target.value)}
-                style={{ width: '180px' }}
+                style={{ width: '140px' }}
               />
-              <button className="btn-primary" onClick={handleRenameDepartment}>Save</button>
+              <button className="btn-primary" onClick={handleRenameDepartment} style={{ padding: '4px 8px' }}>Save</button>
             </div>
           )}
           {!isRenaming && (
@@ -225,31 +254,31 @@ export const Tab2DepartmentCurriculum: React.FC<Tab2Props> = ({
               }}
               title="Rename Department"
             >
-              <Edit3 size={15} /> Rename
+              <Edit2 size={13} /> Rename
             </button>
           )}
         </div>
 
-        <div style={{ display: 'flex', gap: '10px' }}>
+        <div style={{ display: 'flex', gap: '8px' }}>
           <button className="btn-primary" onClick={() => setShowAddModal(true)}>
-            <Plus size={16} /> Add New Department
+            <Plus size={14} /> Add New Department
           </button>
-          <button className="btn-danger" onClick={handleDeleteDepartment} title="Delete Department">
-            <Trash2 size={16} /> Delete Department
+          <button className="btn-danger-outline" onClick={handleDeleteDepartment} title="Delete Department">
+            <Trash2 size={14} /> Delete Department
           </button>
         </div>
       </div>
 
       {/* Real-time Workload Capacity Progress Bar */}
-      <div style={{ background: 'rgba(15, 23, 42, 0.6)', border: '1px solid var(--border-glass)', padding: '1rem 1.2rem', borderRadius: '10px', margin: '1.5rem 0' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-          <span style={{ fontSize: '0.9rem', fontWeight: 700, color: isOverCapacity ? '#fca5a5' : '#86efac' }}>
-            {isOverCapacity ? <AlertCircle size={16} style={{ display: 'inline', marginRight: '6px' }} /> : <CheckCircle2 size={16} style={{ display: 'inline', marginRight: '6px' }} />}
-            Workload Capacity: {totalConfiguredHours} Allocated Contact Hours / {maxDeptCapacity} Max Available Slots
-          </span>
-          <span style={{ fontSize: '0.9rem', fontWeight: 800, color: isOverCapacity ? '#ef4444' : 'var(--cyan-accent)' }}>
+      <div className="progress-bar-container">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', fontWeight: 600, color: isOverCapacity ? '#fca5a5' : '#4ade80' }}>
+            {isOverCapacity ? <AlertCircle size={14} /> : <CheckCircle size={14} />}
+            Workload Capacity: <span style={{ color: '#ffffff', fontWeight: 700 }}>{totalConfiguredHours} Allocated</span> / {maxDeptCapacity} Max Available Slots
+          </div>
+          <div style={{ fontSize: '0.85rem', fontWeight: 800, color: isOverCapacity ? '#ef4444' : 'var(--cyan-accent)' }}>
             {capacityPercent}%
-          </span>
+          </div>
         </div>
         <div className="progress-bar-bg">
           <div
@@ -259,18 +288,21 @@ export const Tab2DepartmentCurriculum: React.FC<Tab2Props> = ({
         </div>
       </div>
 
-      {/* Curriculum Data Table */}
-      <h3 style={{ fontSize: '1.1rem', marginTop: '1rem' }}>Curriculum Schedule for <strong>{selectedDept}</strong></h3>
-      <div className="table-container">
+      {/* Curriculum Schedule Table */}
+      <div className="section-bar-header" style={{ marginTop: '0.5rem' }}>
+        <div className="section-bar-title">Curriculum Schedule for {selectedDept}</div>
+      </div>
+
+      <div className="table-container" style={{ flex: 1 }}>
         <table className="data-table">
           <thead>
             <tr>
-              <th>Course Code / Name (Filtered by Staff Quals)</th>
-              <th>Assigned Faculty</th>
-              <th>Weekly Hours</th>
-              <th>Type</th>
-              <th>Category</th>
-              <th>Action</th>
+              <th>COURSE / SUBJECT</th>
+              <th>ASSIGNED FACULTY</th>
+              <th style={{ textAlign: 'center' }}>WEEKLY HOURS</th>
+              <th>TYPE</th>
+              <th>CATEGORY</th>
+              <th style={{ textAlign: 'center' }}>ACTIONS</th>
             </tr>
           </thead>
           <tbody>
@@ -289,7 +321,7 @@ export const Tab2DepartmentCurriculum: React.FC<Tab2Props> = ({
                     )}
                   </select>
                 </td>
-                <td style={{ width: '180px' }}>
+                <td style={{ width: '130px' }}>
                   <select
                     value={row.Faculty}
                     onChange={(e) => handleCellChange(idx, 'Faculty', e.target.value)}
@@ -299,16 +331,17 @@ export const Tab2DepartmentCurriculum: React.FC<Tab2Props> = ({
                     ))}
                   </select>
                 </td>
-                <td style={{ width: '130px' }}>
+                <td style={{ width: '100px', textAlign: 'center' }}>
                   <input
                     type="number"
                     min={1}
                     max={10}
                     value={row.Hours}
                     onChange={(e) => handleCellChange(idx, 'Hours', parseInt(e.target.value) || 1)}
+                    style={{ textAlign: 'center' }}
                   />
                 </td>
-                <td style={{ width: '140px' }}>
+                <td style={{ width: '110px' }}>
                   <select
                     value={row.Type}
                     onChange={(e) => handleCellChange(idx, 'Type', e.target.value)}
@@ -317,7 +350,7 @@ export const Tab2DepartmentCurriculum: React.FC<Tab2Props> = ({
                     <option value="Lab">Lab</option>
                   </select>
                 </td>
-                <td style={{ width: '160px' }}>
+                <td style={{ width: '130px' }}>
                   <select
                     value={row.Category}
                     onChange={(e) => handleCellChange(idx, 'Category', e.target.value)}
@@ -328,9 +361,14 @@ export const Tab2DepartmentCurriculum: React.FC<Tab2Props> = ({
                   </select>
                 </td>
                 <td style={{ width: '70px', textAlign: 'center' }}>
-                  <button className="btn-danger" onClick={() => handleDeleteSubject(idx)}>
-                    <Trash2 size={16} />
-                  </button>
+                  <div style={{ display: 'flex', justifyContent: 'center', gap: '4px' }}>
+                    <button className="btn-icon-action edit" title="Edit subject">
+                      <Edit2 size={14} />
+                    </button>
+                    <button className="btn-icon-action delete" onClick={() => handleDeleteSubject(idx)} title="Delete subject">
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -338,9 +376,9 @@ export const Tab2DepartmentCurriculum: React.FC<Tab2Props> = ({
         </table>
       </div>
 
-      <div style={{ marginTop: '1.2rem' }}>
+      <div style={{ marginTop: '0.9rem' }}>
         <button className="btn-primary" onClick={handleAddSubject}>
-          <Plus size={16} /> Add Subject to Curriculum
+          <Plus size={14} /> Add Subject to Curriculum
         </button>
       </div>
 
@@ -348,16 +386,16 @@ export const Tab2DepartmentCurriculum: React.FC<Tab2Props> = ({
       {showAddModal && (
         <div className="modal-overlay">
           <div className="modal-content">
-            <h3>➕ Add New Department Configuration</h3>
-            <p style={{ color: 'var(--text-muted)', margin: '0.8rem 0' }}>Enter unique department title:</p>
+            <h3 style={{ color: '#ffffff', marginBottom: '0.5rem' }}>➕ Add New Department Configuration</h3>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '1rem' }}>Enter unique department title:</p>
             <input
               type="text"
               placeholder="e.g., B.Tech ECE, B.Sc Data Science"
               value={newDeptNameInput}
               onChange={(e) => setNewDeptNameInput(e.target.value)}
-              style={{ marginBottom: '1.5rem' }}
+              style={{ marginBottom: '1.2rem' }}
             />
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
               <button className="btn-secondary" onClick={() => setShowAddModal(false)}>Cancel</button>
               <button className="btn-primary" onClick={handleCreateDepartment}>Create Department</button>
             </div>

@@ -347,6 +347,18 @@ with tab_combined:
 # TAB 4: INSTITUTIONAL EXECUTION & RESULTS
 # ----------------------------------------------------
 with tab_results:
+    current_config_hash = hash((
+        str(st.session_state.get("faculty_registry_data")),
+        str(st.session_state.get("depts_curriculum")),
+        str(st.session_state.get("combined_classes_data")),
+        working_days,
+        hours_per_day
+    ))
+
+    # Invalidate stale generated timetable if inputs were changed
+    if st.session_state.get("last_config_hash") != current_config_hash:
+        st.session_state.pop("last_dept_timetables", None)
+
     if st.button("🚀 Generate University-Wide ERP Timetable", type="primary", use_container_width=True):
         # Build StaffRegistry object
         registry = StaffRegistry()
@@ -387,6 +399,7 @@ with tab_results:
         st.session_state.last_conflicts = conflicts
         st.session_state.last_metrics = metrics
         st.session_state.last_global_matrix = scheduler.global_matrix
+        st.session_state.last_config_hash = current_config_hash
 
     if "last_dept_timetables" in st.session_state:
         dept_timetables = st.session_state.last_dept_timetables

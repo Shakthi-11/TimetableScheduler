@@ -331,47 +331,53 @@ class InstitutionalScheduler:
             else:
                 block_size = 1
 
-            for day_name in self.days:
-                if allocated >= c_hours:
-                    break
+            while allocated < c_hours:
+                placed_in_pass = False
+                for day_name in self.days:
+                    if allocated >= c_hours:
+                        break
 
-                for h_idx in range(self.hours_per_day - block_size + 1):
-                    h_indices = list(range(h_idx, h_idx + block_size))
-                    
-                    # Check if all participating departments have FREE slots
-                    depts_free = True
-                    for d_id in c_depts:
-                        if d_id not in dept_timetables:
-                            depts_free = False
-                            break
-                        for idx in h_indices:
-                            if dept_timetables[d_id].loc[day_name, self.hours[idx]] != "FREE":
+                    for h_idx in range(self.hours_per_day - block_size + 1):
+                        h_indices = list(range(h_idx, h_idx + block_size))
+
+                        # Check if all participating departments have FREE slots
+                        depts_free = True
+                        for d_id in c_depts:
+                            if d_id not in dept_timetables:
                                 depts_free = False
                                 break
+                            for idx in h_indices:
+                                if dept_timetables[d_id].loc[day_name, self.hours[idx]] != "FREE":
+                                    depts_free = False
+                                    break
+                            if not depts_free:
+                                break
+
                         if not depts_free:
+                            continue
+
+                        # Check Global Faculty Matrix
+                        can_do, msg = self.global_matrix.can_assign(
+                            c_fac, day_name, h_indices, max_daily, max_consecutive,
+                            dept_id="Combined", subject_name=c_name, is_combined=True, combined_depts=c_depts
+                        )
+                        if can_do:
+                            # Perform assignment across all participating depts & master matrix
+                            label = f"{c_name}-{c_fac} (Combined)"
+                            for h_i in h_indices:
+                                slot_h = self.hours[h_i]
+                                for d_id in c_depts:
+                                    dept_timetables[d_id].loc[day_name, slot_h] = label
+                                self.global_matrix.book_slot(
+                                    c_fac, day_name, h_i, dept_id=",".join(c_depts),
+                                    subject_name=c_name, slot_type=c_type, is_combined=True, combined_depts=c_depts
+                                )
+                            allocated += block_size
+                            placed_in_pass = True
                             break
 
-                    if not depts_free:
-                        continue
-
-                    # Check Global Faculty Matrix
-                    can_do, msg = self.global_matrix.can_assign(
-                        c_fac, day_name, h_indices, max_daily, max_consecutive,
-                        dept_id="Combined", subject_name=c_name, is_combined=True, combined_depts=c_depts
-                    )
-                    if can_do:
-                        # Perform assignment across all participating depts & master matrix
-                        label = f"{c_name}-{c_fac} (Combined)"
-                        for h_i in h_indices:
-                            slot_h = self.hours[h_i]
-                            for d_id in c_depts:
-                                dept_timetables[d_id].loc[day_name, slot_h] = label
-                            self.global_matrix.book_slot(
-                                c_fac, day_name, h_i, dept_id=",".join(c_depts),
-                                subject_name=c_name, slot_type=c_type, is_combined=True, combined_depts=c_depts
-                            )
-                        allocated += block_size
-                        break
+                if not placed_in_pass:
+                    break
 
             if allocated < c_hours:
                 conflicts.append(f"⚠️ Combined Class Conflict: Could not fully schedule Combined Class '{c_name}' ({c_fac}) for depts {c_depts} - Allocated {allocated}/{c_hours} hrs.")

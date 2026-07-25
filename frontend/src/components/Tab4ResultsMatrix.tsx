@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { ScheduleResult, OperatingRules } from '../types';
-import { Rocket, AlertTriangle, CheckCircle, FileSpreadsheet, FileText, Building, Users, Clock, BarChart3 } from 'lucide-react';
+import { ScheduleResult, OperatingRules, FacultyMember, SubjectData, CombinedClass } from '../types';
+import { Calendar, Download, CheckCircle, FileSpreadsheet, Layers, Sparkles, Cpu } from 'lucide-react';
+import { ScheduleCombination, DeptAcademicGrid } from '../utils/schedulerEngine';
 
 interface Tab4Props {
   onGenerate: () => void;
@@ -9,7 +10,38 @@ interface Tab4Props {
   operatingRules: OperatingRules;
   onExportExcel: () => void;
   onExportPdf: () => void;
+  facultyData?: FacultyMember[];
+  deptsCurriculum?: Record<string, SubjectData[]>;
+  combinedClasses?: CombinedClass[];
+  hasGenerated: boolean;
+  combinations: ScheduleCombination[];
+  activeCombinationId: number;
+  setActiveCombinationId: (id: number) => void;
 }
+
+const emptyStateCardStyle: React.CSSProperties = {
+  background: 'rgba(10, 16, 30, 0.65)',
+  border: '1px solid var(--border-glass)',
+  borderRadius: '14px',
+  padding: '3rem 2rem',
+  textAlign: 'center',
+  margin: '1.5rem 0',
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  gap: '1rem',
+};
+
+const iconCircleStyle: React.CSSProperties = {
+  width: '64px',
+  height: '64px',
+  borderRadius: '50%',
+  background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.3), rgba(56, 189, 248, 0.3))',
+  border: '1px solid var(--border-glass)',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+};
 
 export const Tab4ResultsMatrix: React.FC<Tab4Props> = ({
   onGenerate,
@@ -18,213 +50,246 @@ export const Tab4ResultsMatrix: React.FC<Tab4Props> = ({
   operatingRules,
   onExportExcel,
   onExportPdf,
+  facultyData = [],
+  deptsCurriculum = {},
+  combinedClasses = [],
+  hasGenerated,
+  combinations,
+  activeCombinationId,
+  setActiveCombinationId,
 }) => {
-  const [selectedDeptView, setSelectedDeptView] = useState<string>('');
-  const [selectedFacView, setSelectedFacView] = useState<string>('');
-  const [viewTab, setViewTab] = useState<'depts' | 'faculty' | 'analytics'>('depts');
+  const [selectedDeptView, setSelectedDeptView] = useState<string>('ALL');
+  const [selectedSemester, setSelectedSemester] = useState<number>(operatingRules.semester || 4);
 
-  const deptNames = scheduleResult ? Object.keys(scheduleResult.dept_timetables) : [];
-  const facultyIds = scheduleResult ? scheduleResult.faculty_ids : [];
+  const deptNames = Object.keys(deptsCurriculum);
+  const deptListStr = deptNames.join(', ');
 
-  const activeDeptView = selectedDeptView || deptNames[0] || '';
-  const activeFacView = selectedFacView || facultyIds[0] || '';
+  const handleGenerateClick = () => {
+    onGenerate();
+  };
 
-  const currentDeptTimetable = (scheduleResult && activeDeptView) ? scheduleResult.dept_timetables[activeDeptView] || [] : [];
-  const currentFacMatrix = (scheduleResult && activeFacView) ? scheduleResult.faculty_matrices[activeFacView] || [] : [];
+  const activeCombination = combinations.find(c => c.id === activeCombinationId) || combinations[0];
+  const activeGrids: Record<string, DeptAcademicGrid> = activeCombination ? activeCombination.grids : {};
+
+  const deptsToRender = selectedDeptView === 'ALL'
+    ? deptNames
+    : [selectedDeptView];
 
   return (
     <div className="glass-card">
-      <h2><Rocket style={{ display: 'inline', marginRight: '8px' }} /> 4. Institutional Timetable & Global State Matrix</h2>
-      <p style={{ color: 'var(--text-muted)', fontSize: '0.92rem', marginBottom: '1.5rem' }}>
-        Generate university-wide timetable grids with zero double-bookings and enforced rest breaks across all departments.
-      </p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.6rem' }}>
+        <div>
+          <div className="card-header-title">
+            <Calendar size={18} color="#60a5fa" /> Timetable Matrix
+          </div>
+          <p className="card-subtitle">
+            Advanced constraint-based timetable solver for university departments.
+          </p>
+        </div>
 
-      <button
-        className="btn-primary"
-        onClick={onGenerate}
-        disabled={isLoading}
-        style={{ width: '100%', padding: '1rem', fontSize: '1.1rem', marginBottom: '2rem' }}
-      >
-        {isLoading ? '⏳ Computing Optimal Institutional Constraints...' : '🚀 Generate University-Wide ERP Timetable'}
-      </button>
+        {hasGenerated && (
+          <button
+            className="btn-primary"
+            onClick={handleGenerateClick}
+            disabled={isLoading}
+            style={{ padding: '0.45rem 1rem', fontSize: '0.85rem' }}
+          >
+            {isLoading ? '⏳ Computing Schedule...' : '🔄 Re-Generate Timetables'}
+          </button>
+        )}
+      </div>
 
-      {scheduleResult && (
+      {/* Initial Empty State Before Generation */}
+      {!hasGenerated ? (
+        <div style={emptyStateCardStyle}>
+          <div style={iconCircleStyle}>
+            <Cpu size={32} color="#38bdf8" />
+          </div>
+
+          <div>
+            <h3 style={{ color: '#ffffff', fontSize: '1.3rem', fontWeight: 800, marginBottom: '0.4rem' }}>
+              Advanced Constraint Timetable Engine
+            </h3>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', maxWidth: '520px', margin: '0 auto' }}>
+              Configured with <strong>{deptNames.length} Department(s)</strong> ({deptListStr}), <strong>{facultyData.length} Faculty Profile(s)</strong>, and <strong>{combinedClasses.length} Combined Session(s)</strong>.
+            </p>
+          </div>
+
+          <button
+            className="btn-primary"
+            onClick={handleGenerateClick}
+            disabled={isLoading}
+            style={{ padding: '0.85rem 2.2rem', fontSize: '1rem', marginTop: '0.5rem', fontWeight: 700 }}
+          >
+            {isLoading ? '⏳ Solving Constraints...' : '🚀 Generate University Timetables'}
+          </button>
+        </div>
+      ) : (
         <>
-          {/* Metrics Header */}
-          <div className="metrics-grid">
-            <div className="metric-card">
-              <div className="metric-label"><Building size={16} /> Total Departments</div>
-              <div className="metric-value">{scheduleResult.metrics.total_departments}</div>
-            </div>
-            <div className="metric-card">
-              <div className="metric-label"><Users size={16} /> Faculty Matrix Tracked</div>
-              <div className="metric-value">{scheduleResult.metrics.total_faculty}</div>
-            </div>
-            <div className="metric-card">
-              <div className="metric-label"><Clock size={16} /> Total Allocated Hours</div>
-              <div className="metric-value">{scheduleResult.metrics.total_allocated_slots}</div>
-            </div>
-            <div className="metric-card">
-              <div className="metric-label"><BarChart3 size={16} /> Institutional Capacity</div>
-              <div className="metric-value">{scheduleResult.metrics.total_institution_slots}</div>
-            </div>
-          </div>
-
-          {/* Conflict Diagnostics Banner */}
-          {scheduleResult.conflicts && scheduleResult.conflicts.length > 0 ? (
-            <div className="alert-banner warning">
-              <AlertTriangle size={24} />
-              <div>
-                <p style={{ fontWeight: 700, margin: 0 }}>Institutional Schedule Warnings / Qualification Alerts Identified:</p>
-                <ul style={{ marginTop: '6px', paddingLeft: '20px' }}>
-                  {scheduleResult.conflicts.map((conf, i) => (
-                    <li key={i}>{conf}</li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          ) : (
-            <div className="alert-banner success">
-              <CheckCircle size={24} />
-              <div>
-                ✅ Zero Cross-Department Double-Bookings Detected. Global Faculty Matrix State Verified with Rest Breaks Enforced.
-              </div>
-            </div>
-          )}
-
-          {/* View Selection Tabs */}
-          <div style={{ display: 'flex', gap: '10px', borderBottom: '1px solid var(--border-glass)', marginBottom: '1.5rem', marginTop: '1.5rem' }}>
-            <button
-              className={`tab-btn ${viewTab === 'depts' ? 'active' : ''}`}
-              onClick={() => setViewTab('depts')}
-            >
-              🏢 Department Class Grids
-            </button>
-            <button
-              className={`tab-btn ${viewTab === 'faculty' ? 'active' : ''}`}
-              onClick={() => setViewTab('faculty')}
-            >
-              👤 Global Faculty Master Matrix
-            </button>
-            <button
-              className={`tab-btn ${viewTab === 'analytics' ? 'active' : ''}`}
-              onClick={() => setViewTab('analytics')}
-            >
-              📈 Workload Analytics
-            </button>
-          </div>
-
-          {/* View 1: Department Class Grids */}
-          {viewTab === 'depts' && (
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '1rem' }}>
-                <label style={{ fontWeight: 700, color: 'var(--cyan-accent)' }}>Select Department View:</label>
+          {/* Top Controls Bar */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.8rem', marginBottom: '1rem', background: 'rgba(15, 23, 42, 0.6)', padding: '6px 12px', borderRadius: '8px', border: '1px solid var(--border-glass)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <label style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600 }}>Department View</label>
                 <select
-                  value={activeDeptView}
+                  value={selectedDeptView}
                   onChange={(e) => setSelectedDeptView(e.target.value)}
-                  style={{ width: '220px' }}
+                  style={{ width: '220px', padding: '3px 8px', fontSize: '0.82rem', fontWeight: 700 }}
                 >
+                  <option value="ALL">🏢 All Departments ({deptNames.length})</option>
                   {deptNames.map((d) => (
                     <option key={d} value={d}>{d}</option>
                   ))}
                 </select>
               </div>
 
-              <div className="table-container">
-                <table className="data-table">
-                  <thead>
-                    <tr>
-                      {currentDeptTimetable.length > 0 && Object.keys(currentDeptTimetable[0]).map((col) => (
-                        <th key={col}>{col}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {currentDeptTimetable.map((row, rIdx) => (
-                      <tr key={rIdx}>
-                        {Object.values(row).map((cell, cIdx) => (
-                          <td key={cIdx} style={{ fontWeight: cIdx === 0 ? 700 : 400, color: String(cell).includes('LUNCH') ? 'var(--text-muted)' : 'inherit' }}>
-                            {String(cell)}
-                          </td>
-                        ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-          {/* View 2: Global Faculty Master Matrix */}
-          {viewTab === 'faculty' && (
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '1rem' }}>
-                <label style={{ fontWeight: 700, color: 'var(--cyan-accent)' }}>Select Faculty Master Schedule:</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <label style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600 }}>Semester</label>
                 <select
-                  value={activeFacView}
-                  onChange={(e) => setSelectedFacView(e.target.value)}
-                  style={{ width: '220px' }}
+                  value={selectedSemester}
+                  onChange={(e) => setSelectedSemester(parseInt(e.target.value))}
+                  style={{ width: '110px', padding: '3px 8px', fontSize: '0.82rem', fontWeight: 700 }}
                 >
-                  {facultyIds.map((f) => (
-                    <option key={f} value={f}>{f}</option>
+                  {[1, 2, 3, 4, 5, 6, 7, 8].map((s) => (
+                    <option key={s} value={s}>Semester {s}</option>
                   ))}
                 </select>
               </div>
+            </div>
+          </div>
 
-              <h4 style={{ marginBottom: '1rem' }}>Master Schedule Matrix for <strong>{activeFacView}</strong> (Cross-Department View)</h4>
-              <div className="table-container">
-                <table className="data-table">
-                  <thead>
-                    <tr>
-                      {currentFacMatrix.length > 0 && Object.keys(currentFacMatrix[0]).map((col) => (
-                        <th key={col}>{col}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {currentFacMatrix.map((row, rIdx) => (
-                      <tr key={rIdx}>
-                        {Object.values(row).map((cell, cIdx) => (
-                          <td key={cIdx} style={{ fontWeight: cIdx === 0 ? 700 : 400 }}>
-                            {String(cell)}
-                          </td>
-                        ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+          {/* Multiple Timetable Combination Switcher Bar */}
+          <div style={{ background: 'rgba(18, 28, 54, 0.7)', borderRadius: '12px', padding: '1rem', border: '1px solid var(--border-glass)', marginBottom: '1.2rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '0.8rem' }}>
+              <Sparkles size={16} color="#38bdf8" />
+              <span style={{ fontSize: '0.88rem', fontWeight: 800, color: '#ffffff' }}>
+                Generated Timetable Combinations (Select Optimization Profile):
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '0.6rem' }}>
+              {combinations.map((comb) => (
+                <button
+                  key={comb.id}
+                  onClick={() => setActiveCombinationId(comb.id)}
+                  style={{
+                    background: activeCombinationId === comb.id
+                      ? 'linear-gradient(135deg, rgba(56, 189, 248, 0.3), rgba(37, 99, 235, 0.4))'
+                      : 'rgba(10, 16, 30, 0.6)',
+                    color: activeCombinationId === comb.id ? '#ffffff' : 'var(--text-muted)',
+                    border: `1px solid ${activeCombinationId === comb.id ? '#38bdf8' : 'var(--border-glass)'}`,
+                    borderRadius: '8px',
+                    padding: '8px 14px',
+                    fontSize: '0.84rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    boxShadow: activeCombinationId === comb.id ? '0 4px 12px rgba(37, 99, 235, 0.3)' : 'none'
+                  }}
+                >
+                  {activeCombinationId === comb.id ? '✓ ' : ''}{comb.name}
+                </button>
+              ))}
+            </div>
+
+            {activeCombination && (
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', margin: 0 }}>
+                💡 <strong>Profile Details:</strong> {activeCombination.description}
+              </p>
+            )}
+          </div>
+
+          {/* Status Alert Banner */}
+          <div className="alert-banner success" style={{ marginBottom: '1.2rem', flexDirection: 'column', alignItems: 'flex-start', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <CheckCircle size={18} />
+              <div>
+                Human-grade academic timetables generated for <strong>{deptNames.length} Department(s)</strong> ({deptListStr}). All constraints satisfied.
               </div>
             </div>
-          )}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '4px' }}>
+              <span className="tag-badge-subject" style={{ background: 'rgba(34, 197, 94, 0.2)', color: '#4ade80', borderColor: 'rgba(34, 197, 94, 0.4)' }}>
+                ✓ Multi-Day Theory Distribution (1 hr/day)
+              </span>
+              <span className="tag-badge-subject" style={{ background: 'rgba(56, 189, 248, 0.2)', color: '#38bdf8', borderColor: 'rgba(56, 189, 248, 0.4)' }}>
+                ✓ Synchronized Joint Combined Sessions
+              </span>
+              <span className="tag-badge-subject" style={{ background: 'rgba(168, 85, 247, 0.2)', color: '#c084fc', borderColor: 'rgba(168, 85, 247, 0.4)' }}>
+                ✓ Faculty Rest Breaks & Fatigue Limits
+              </span>
+              <span className="tag-badge-subject" style={{ background: 'rgba(251, 146, 60, 0.2)', color: '#fb923c', borderColor: 'rgba(251, 146, 60, 0.4)' }}>
+                ✓ Pedagogical Morning Core Lectures
+              </span>
+            </div>
+          </div>
 
-          {/* View 3: Workload Analytics */}
-          {viewTab === 'analytics' && (
-            <div>
-              <h4 style={{ marginBottom: '1rem' }}>Departmental Allocated Hours Summary</h4>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1rem' }}>
-                {Object.entries(scheduleResult.metrics.dept_metrics).map(([d, m]) => (
-                  <div key={d} className="glass-card" style={{ background: 'rgba(30, 41, 59, 0.6)' }}>
-                    <h5 style={{ color: 'var(--cyan-accent)', fontSize: '1.1rem', marginBottom: '6px' }}>{d}</h5>
-                    <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Allocated Contact Hours: <strong style={{ color: '#fff' }}>{m.allocated_slots} hrs</strong></p>
-                    <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Capacity Load Factor: <strong style={{ color: 'var(--cyan-accent)' }}>{(m.load_factor * 100).toFixed(1)}%</strong></p>
-                    <div className="progress-bar-bg" style={{ marginTop: '10px' }}>
-                      <div className="progress-bar-fill normal" style={{ width: `${Math.min(100, m.load_factor * 100)}%` }} />
-                    </div>
+          {/* Render Generated Timetable Grids for Selected Combination */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', flex: 1 }}>
+            {deptsToRender.map((dName) => {
+              const gridData: DeptAcademicGrid = activeGrids[dName] || [];
+
+              return (
+                <div key={dName} style={{ background: 'rgba(10, 15, 26, 0.7)', borderRadius: '10px', padding: '1rem', border: '1px solid var(--border-glass)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem' }}>
+                    <h3 style={{ color: 'var(--cyan-accent)', fontSize: '1rem', margin: 0, fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Layers size={15} /> Department Timetable: <span style={{ color: '#ffffff' }}>{dName}</span> ({activeCombination ? activeCombination.name : 'Combination 1'})
+                    </h3>
                   </div>
-                ))}
-              </div>
-            </div>
-          )}
 
-          {/* Branded Export Utility */}
-          <hr style={{ borderColor: 'var(--border-glass)', margin: '2rem 0' }} />
-          <h3>📥 Branded Export Utility</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.2rem', marginTop: '1rem' }}>
-            <button className="btn-primary" onClick={onExportExcel} style={{ padding: '0.9rem' }}>
-              <FileSpreadsheet size={20} /> Download Multi-Sheet Excel Workbook (.xlsx)
+                  <div className="table-container">
+                    <table className="academic-timetable-table">
+                      <thead>
+                        <tr>
+                          <th style={{ width: '100px', textAlign: 'center' }}>Day Order</th>
+                          <th style={{ textAlign: 'center' }}>I Hour</th>
+                          <th style={{ textAlign: 'center' }}>II Hour</th>
+                          <th style={{ textAlign: 'center' }}>III Hour</th>
+                          <th style={{ textAlign: 'center' }}>IV Hour</th>
+                          <th style={{ textAlign: 'center' }}>V Hour</th>
+                          <th style={{ textAlign: 'center' }}>VI Hour</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {gridData.map((row, idx) => (
+                          <tr key={idx}>
+                            <td className="day-order-cell">
+                              {row.dayOrder}
+                            </td>
+
+                            {row.noClasses ? (
+                              <td colSpan={6} className="no-classes-cell">
+                                {row.label || 'No CLASSES'}
+                              </td>
+                            ) : (
+                              row.slots.map((slot, sIdx) => (
+                                <td
+                                  key={sIdx}
+                                  colSpan={slot.colSpan || 1}
+                                  className="academic-slot-cell"
+                                >
+                                  <div style={{ fontWeight: 700 }}>
+                                    {slot.title === 'Free Slot' ? '' : slot.title}
+                                  </div>
+                                </td>
+                              ))
+                            )}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Footer Actions */}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '1.2rem' }}>
+            <button className="btn-secondary" onClick={onExportExcel} title="Export Excel Workbook">
+              <FileSpreadsheet size={14} /> Download Excel Workbook (.xlsx)
             </button>
-            <button className="btn-primary" onClick={onExportPdf} style={{ padding: '0.9rem' }}>
-              <FileText size={20} /> Generate Formal PDF Institutional Report (.pdf)
+            <button className="btn-primary" onClick={onExportPdf} title="Export PDF Timetable Report">
+              <Download size={14} /> Export Timetable (PDF)
             </button>
           </div>
         </>

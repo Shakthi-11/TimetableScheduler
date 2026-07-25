@@ -1,6 +1,6 @@
 import React from 'react';
 import { CombinedClass, FacultyMember, SubjectData } from '../types';
-import { Link2, Plus, Trash2 } from 'lucide-react';
+import { Link2, Plus, Trash2, Users, Info } from 'lucide-react';
 
 interface Tab3Props {
   combinedClasses: CombinedClass[];
@@ -19,10 +19,8 @@ export const Tab3CombinedClasses: React.FC<Tab3Props> = ({
 }) => {
   const availableFaculties = facultyData.map((f) => f.Faculty_ID).filter(Boolean);
 
-  // Extract all unique course names across all department curriculums & staff qualifications
   const allCourseNames: string[] = [];
   
-  // 1. From department curriculums
   Object.values(deptsCurriculum).forEach((subList) => {
     subList.forEach((sub) => {
       if (sub.Subject.trim() && !allCourseNames.includes(sub.Subject.trim())) {
@@ -31,7 +29,6 @@ export const Tab3CombinedClasses: React.FC<Tab3Props> = ({
     });
   });
 
-  // 2. From staff registry qualified subjects
   facultyData.forEach((f) => {
     const quals = f.Qualified.split(',').map((q) => q.trim()).filter(Boolean);
     quals.forEach((q) => {
@@ -41,7 +38,6 @@ export const Tab3CombinedClasses: React.FC<Tab3Props> = ({
     });
   });
 
-  // Fallback defaults if empty
   if (allCourseNames.length === 0) {
     allCourseNames.push("Ethics in Tech", "Python", "ML", "Signals & Systems", "Project-c");
   }
@@ -67,7 +63,7 @@ export const Tab3CombinedClasses: React.FC<Tab3Props> = ({
     setCombinedClasses([
       ...combinedClasses,
       {
-        Subject: allCourseNames[0] || 'Joint Lecture',
+        Subject: allCourseNames[0] || 'Ethics in Tech',
         Faculty: availableFaculties[0] || 'JP',
         ParticipatingDepts: availableDepartments.slice(0, 2),
         Hours: 2,
@@ -83,21 +79,41 @@ export const Tab3CombinedClasses: React.FC<Tab3Props> = ({
 
   return (
     <div className="glass-card">
-      <h2><Link2 style={{ display: 'inline', marginRight: '8px' }} /> 3. Combined / Merged Multi-Department Sessions</h2>
-      <p style={{ color: 'var(--text-muted)', fontSize: '0.92rem', marginBottom: '1.5rem' }}>
-        Schedule joint lectures where a single faculty teaches multiple department sections simultaneously in the exact same slot.
-      </p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div>
+          <div className="card-header-title">
+            <Link2 size={18} color="#60a5fa" /> Combined / Merged Multi-Department Sessions
+          </div>
+          <p className="card-subtitle">
+            Schedule joint lectures where a single faculty teaches multiple departments simultaneously.
+          </p>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(30, 41, 59, 0.5)', padding: '6px 12px', borderRadius: '20px', border: '1px solid var(--border-glass)' }}>
+          <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'linear-gradient(135deg, #a855f7, #6366f1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Users size={14} color="#fff" />
+          </div>
+          <span style={{ fontSize: '0.75rem', color: '#c084fc', fontWeight: 700 }}>⇄</span>
+          <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'linear-gradient(135deg, #3b82f6, #06b6d4)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Users size={14} color="#fff" />
+          </div>
+        </div>
+      </div>
+
+      <div className="section-bar-header">
+        <div className="section-bar-title">Create Joint Combined Session</div>
+      </div>
 
       <div className="table-container">
         <table className="data-table">
           <thead>
             <tr>
-              <th>Joint Course Name (All Courses Dropdown)</th>
+              <th>Joint Course</th>
               <th>Assigned Faculty</th>
               <th>Participating Departments</th>
-              <th>Weekly Hours</th>
+              <th style={{ textAlign: 'center' }}>Weekly Hours</th>
               <th>Type</th>
-              <th>Action</th>
+              <th style={{ textAlign: 'center' }}>Action</th>
             </tr>
           </thead>
           <tbody>
@@ -116,7 +132,7 @@ export const Tab3CombinedClasses: React.FC<Tab3Props> = ({
                     )}
                   </select>
                 </td>
-                <td style={{ width: '180px' }}>
+                <td style={{ width: '130px' }}>
                   <select
                     value={row.Faculty}
                     onChange={(e) => handleCellChange(idx, 'Faculty', e.target.value)}
@@ -127,7 +143,7 @@ export const Tab3CombinedClasses: React.FC<Tab3Props> = ({
                   </select>
                 </td>
                 <td>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
                     {availableDepartments.map((dept) => {
                       const isSelected = (row.ParticipatingDepts || []).includes(dept);
                       return (
@@ -136,12 +152,12 @@ export const Tab3CombinedClasses: React.FC<Tab3Props> = ({
                           type="button"
                           onClick={() => handleDeptToggle(idx, dept)}
                           style={{
-                            background: isSelected ? 'rgba(56, 189, 248, 0.25)' : 'rgba(30, 41, 59, 0.5)',
-                            color: isSelected ? '#38bdf8' : 'var(--text-muted)',
-                            border: `1px solid ${isSelected ? 'var(--cyan-accent)' : 'var(--border-glass)'}`,
-                            borderRadius: '12px',
-                            padding: '4px 10px',
-                            fontSize: '0.8rem',
+                            background: isSelected ? 'rgba(37, 99, 235, 0.25)' : 'rgba(30, 41, 59, 0.5)',
+                            color: isSelected ? '#93c5fd' : 'var(--text-muted)',
+                            border: `1px solid ${isSelected ? '#3b82f6' : 'var(--border-glass)'}`,
+                            borderRadius: '10px',
+                            padding: '2px 7px',
+                            fontSize: '0.72rem',
                             fontWeight: 600,
                             cursor: 'pointer',
                           }}
@@ -152,16 +168,17 @@ export const Tab3CombinedClasses: React.FC<Tab3Props> = ({
                     })}
                   </div>
                 </td>
-                <td style={{ width: '130px' }}>
+                <td style={{ width: '90px', textAlign: 'center' }}>
                   <input
                     type="number"
                     min={1}
                     max={6}
                     value={row.Hours}
                     onChange={(e) => handleCellChange(idx, 'Hours', parseInt(e.target.value) || 1)}
+                    style={{ textAlign: 'center' }}
                   />
                 </td>
-                <td style={{ width: '140px' }}>
+                <td style={{ width: '110px' }}>
                   <select
                     value={row.Type}
                     onChange={(e) => handleCellChange(idx, 'Type', e.target.value)}
@@ -171,8 +188,8 @@ export const Tab3CombinedClasses: React.FC<Tab3Props> = ({
                   </select>
                 </td>
                 <td style={{ width: '70px', textAlign: 'center' }}>
-                  <button className="btn-danger" onClick={() => handleDeleteCombined(idx)}>
-                    <Trash2 size={16} />
+                  <button className="btn-icon-action delete" onClick={() => handleDeleteCombined(idx)} title="Delete combined session">
+                    <Trash2 size={14} />
                   </button>
                 </td>
               </tr>
@@ -181,10 +198,15 @@ export const Tab3CombinedClasses: React.FC<Tab3Props> = ({
         </table>
       </div>
 
-      <div style={{ marginTop: '1.2rem' }}>
+      <div style={{ marginTop: '0.9rem' }}>
         <button className="btn-primary" onClick={handleAddCombined}>
-          <Plus size={16} /> Add Joint Combined Session
+          <Plus size={14} /> Add Joint Combined Session
         </button>
+      </div>
+
+      <div style={{ marginTop: '1.2rem', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+        <Info size={14} color="#60a5fa" />
+        <span>Combined sessions will be placed in the timetable without clashes across selected departments.</span>
       </div>
     </div>
   );
