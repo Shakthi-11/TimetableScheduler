@@ -7,7 +7,7 @@ import { Tab3CombinedClasses } from './components/Tab3CombinedClasses';
 import { Tab4ResultsMatrix } from './components/Tab4ResultsMatrix';
 import { FacultyMember, SubjectData, CombinedClass, OperatingRules, ScheduleResult } from './types';
 
-const API_BASE = '/api';
+const API_BASE = 'http://localhost:8000/api';
 
 export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState(0);
