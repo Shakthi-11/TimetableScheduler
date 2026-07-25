@@ -271,17 +271,28 @@ with tab_depts:
         
         dept_df = pd.DataFrame(curr_list) if curr_list else pd.DataFrame(columns=["Subject", "Faculty", "Hours", "Type", "Category"])
         
-        # Extract unique qualified subjects for the currently selected department from Staff Registry
+        # 1. Convert Staff Registry into DataFrame
+        staff_registry_df = pd.DataFrame(st.session_state.faculty_registry_data)
+        
+        # 2. Extract qualified subjects strictly mapped to currently selected department
         dept_qualified_subjects = []
-        for f in st.session_state.faculty_registry_data:
-            f_dept = str(f.get("Primary_Dept", "")).strip()
-            if f_dept.lower() == selected_dept.strip().lower():
-                quals = [q.strip() for q in str(f.get("Qualified", "")).split(",") if q.strip()]
-                for q in quals:
-                    if q not in dept_qualified_subjects:
-                        dept_qualified_subjects.append(q)
+        if not staff_registry_df.empty:
+            dept_col = "Primary_Dept" if "Primary_Dept" in staff_registry_df.columns else "Primary Department"
+            qual_col = "Qualified" if "Qualified" in staff_registry_df.columns else "Qualified Subjects (Comma-Separated)"
+            
+            if dept_col in staff_registry_df.columns and qual_col in staff_registry_df.columns:
+                # Filter staff registry strictly for faculty matching selected_dept
+                dept_staff = staff_registry_df[
+                    staff_registry_df[dept_col].astype(str).str.strip().str.lower() == selected_dept.strip().lower()
+                ]
+                # Extract and split comma-separated strings
+                for qual_str in dept_staff[qual_col].dropna().astype(str):
+                    for subj in qual_str.split(","):
+                        subj_clean = subj.strip()
+                        if subj_clean and subj_clean not in dept_qualified_subjects:
+                            dept_qualified_subjects.append(subj_clean)
 
-        # Preserve any existing subjects in the department dataframe
+        # Preserve existing subjects already in department curriculum dataframe if any
         if not dept_df.empty and "Subject" in dept_df.columns:
             for s in dept_df["Subject"].dropna().tolist():
                 s_clean = str(s).strip()
@@ -293,7 +304,11 @@ with tab_depts:
             num_rows="dynamic",
             use_container_width=True,
             column_config={
-                "Subject": st.column_config.SelectboxColumn("Course Code / Name", options=dept_qualified_subjects, required=True),
+                "Subject": st.column_config.SelectboxColumn(
+                    "Course Code / Name", 
+                    options=dept_qualified_subjects, 
+                    required=True
+                ),
                 "Faculty": st.column_config.SelectboxColumn("Assigned Faculty", options=available_faculties, required=True),
                 "Hours": st.column_config.NumberColumn("Weekly Contact Hours", min_value=1, max_value=10, default=3),
                 "Type": st.column_config.SelectboxColumn("Type", options=["Theory", "Lab"], default="Theory"),
