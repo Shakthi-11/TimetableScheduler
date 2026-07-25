@@ -168,21 +168,21 @@ st.markdown(f"""
 # 5. INITIALIZE STATE & DEFAULT PRESETS
 if "faculty_registry_data" not in st.session_state:
     st.session_state.faculty_registry_data = [
-        {"Faculty_ID": "MR", "Name": "Prof. MR", "Primary_Dept": "B.Tech CS", "Qualified": "Python, Python Lab, AI", "Max_Daily": 4, "Max_Cons": 2},
-        {"Faculty_ID": "VR", "Name": "Prof. VR", "Primary_Dept": "B.Tech CS", "Qualified": "ML, ML Lab, Data Mining", "Max_Daily": 4, "Max_Cons": 2},
-        {"Faculty_ID": "JP", "Name": "Dr. JP", "Primary_Dept": "B.Tech ECE", "Qualified": "Project-c, Ethics, Signals", "Max_Daily": 4, "Max_Cons": 2},
-        {"Faculty_ID": "JPS", "Name": "Prof. JPS", "Primary_Dept": "B.Tech ECE", "Qualified": "Signals, Systems, Project-OOPS", "Max_Daily": 4, "Max_Cons": 2},
+        {"Faculty_ID": "MR", "Name": "Prof. MR", "Primary_Dept": "B.sc CS", "Qualified": "Python, Python Lab, AI", "Max_Daily": 4, "Max_Cons": 2},
+        {"Faculty_ID": "VR", "Name": "Prof. VR", "Primary_Dept": "B.sc CS", "Qualified": "ML, ML Lab, Data Mining", "Max_Daily": 4, "Max_Cons": 2},
+        {"Faculty_ID": "JP", "Name": "Dr. JP", "Primary_Dept": "BCA", "Qualified": "Project-c, Ethics, Signals", "Max_Daily": 4, "Max_Cons": 2},
+        {"Faculty_ID": "JPS", "Name": "Prof. JPS", "Primary_Dept": "BCA", "Qualified": "Signals, Systems, Project-OOPS", "Max_Daily": 4, "Max_Cons": 2},
     ]
 
 if "depts_curriculum" not in st.session_state:
     st.session_state.depts_curriculum = {
-        "B.Tech Computer Science": [
+        "B.sc CS": [
             {"Subject": "Python", "Faculty": "MR", "Hours": 4, "Type": "Theory", "Category": "Core Theory"},
             {"Subject": "Python Lab", "Faculty": "MR", "Hours": 3, "Type": "Lab", "Category": "Lab"},
             {"Subject": "ML", "Faculty": "VR", "Hours": 3, "Type": "Theory", "Category": "Core Theory"},
             {"Subject": "ML Lab", "Faculty": "VR", "Hours": 3, "Type": "Lab", "Category": "Lab"},
         ],
-        "B.Tech Electronics & Comm": [
+        "BCA": [
             {"Subject": "Signals & Systems", "Faculty": "JPS", "Hours": 3, "Type": "Theory", "Category": "Core Theory"},
             {"Subject": "ML", "Faculty": "VR", "Hours": 3, "Type": "Theory", "Category": "Core Theory"}, # VR shared across departments!
             {"Subject": "Project-c", "Faculty": "JP", "Hours": 2, "Type": "Theory", "Category": "Core Theory"},
@@ -194,7 +194,7 @@ if "combined_classes_data" not in st.session_state:
         {
             "Subject": "Ethics in Tech",
             "Faculty": "JP",
-            "ParticipatingDepts": ["B.Tech Computer Science", "B.Tech Electronics & Comm"],
+            "ParticipatingDepts": ["B.sc CS", "BCA"],
             "Hours": 2,
             "Type": "Theory"
         }
@@ -202,7 +202,7 @@ if "combined_classes_data" not in st.session_state:
 
 # 6. MAIN NAVIGATION TABS
 tab_staff, tab_depts, tab_combined, tab_results = st.tabs([
-    "👤 Staff Registry & Fatigue Limits",
+    "👤 Staff Registry",
     "🏢 Multi-Department Curriculums",
     "🔗 Combined Classes Config",
     "🚀 Institutional Timetable & Global State Matrix"
@@ -245,11 +245,11 @@ with tab_depts:
     with c2:
         hours_per_day = st.number_input("Daily Operating Hours", 1, 10, 6)
     with c3:
-        break_option = st.selectbox("Institutional Lunch Break Slot", ["Hour IV (Lunch)", "Hour III (Lunch)", "None"], index=0)
+        break_option = st.selectbox("Institutional Lunch Break Slot", ["None", "Hour IV (Lunch)", "Hour III (Lunch)"], index=0)
     with c4:
         semester = st.selectbox("Current Semester", [1, 2, 3, 4, 5, 6, 7, 8], index=3)
 
-    break_slot_map = {"Hour IV (Lunch)": 3, "Hour III (Lunch)": 2, "None": None}
+    break_slot_map = {"None": None, "Hour IV (Lunch)": 3, "Hour III (Lunch)": 2}
     break_slot_idx = break_slot_map.get(break_option)
 
     st.divider()

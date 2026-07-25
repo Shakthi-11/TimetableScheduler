@@ -104,40 +104,28 @@ def export_to_excel(timetable_df_or_dict, global_matrix=None, metrics=None):
     """
     Exports timetables to a multi-sheet Excel workbook.
     Supports single DataFrame or dictionary of department DataFrames, plus master matrix.
-    Guarantees unique, valid sheet names and at least one visible sheet.
     """
     output = io.BytesIO()
-    sheets_written = set()
-
-    def get_unique_sheet_name(name):
-        clean = re.sub(r'[\:\\/\?\*\[\]]', '_', str(name)).strip()
-        if not clean:
-            clean = "Sheet"
-        clean = clean[:31]
-        base_name = clean
-        counter = 1
-        while clean.lower() in sheets_written:
-            suffix = f"_{counter}"
-            clean = f"{base_name[:31 - len(suffix)]}{suffix}"
-            counter += 1
-        sheets_written.add(clean.lower())
-        return clean
-
+    sheets_written = 0
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
         if isinstance(timetable_df_or_dict, pd.DataFrame):
-            s_name = get_unique_sheet_name("Timetable")
-            timetable_df_or_dict.to_excel(writer, sheet_name=s_name)
-        elif isinstance(timetable_df_or_dict, dict) and timetable_df_or_dict:
+            timetable_df_or_dict.to_excel(writer, sheet_name="Timetable")
+            sheets_written += 1
+        elif isinstance(timetable_df_or_dict, dict):
             for dept_name, df in timetable_df_or_dict.items():
-                s_name = get_unique_sheet_name(dept_name)
-                df.to_excel(writer, sheet_name=s_name)
+                safe_name = str(dept_name) if dept_name else "Department"
+                safe_sheet_name = re.sub(r'[\:\\/\?\*\[\]]', '_', safe_name)[:31] or "Department"
+                df.to_excel(writer, sheet_name=safe_sheet_name)
+                sheets_written += 1
 
         if global_matrix and hasattr(global_matrix, 'faculty_ids'):
             for fac_id in sorted(list(global_matrix.faculty_ids)):
                 fac_df = global_matrix.to_dataframe(fac_id)
                 if not fac_df.empty:
-                    s_name = get_unique_sheet_name(f"Faculty_{fac_id}")
-                    fac_df.to_excel(writer, sheet_name=s_name)
+                    safe_name = str(fac_id) if fac_id else "Faculty"
+                    safe_sheet_name = re.sub(r'[\:\\/\?\*\[\]]', '_', f"Faculty_{safe_name}")[:31] or "Faculty"
+                    fac_df.to_excel(writer, sheet_name=safe_sheet_name)
+                    sheets_written += 1
 
         if metrics:
             summary_rows = [
@@ -145,12 +133,10 @@ def export_to_excel(timetable_df_or_dict, global_matrix=None, metrics=None):
                 {"Metric": "Total Faculty Tracked", "Value": metrics.get("total_faculty", 0)},
                 {"Metric": "Total Allocated Operating Hours", "Value": metrics.get("total_allocated_slots", 0)},
             ]
-            s_name = get_unique_sheet_name("Institutional Diagnostics")
-            pd.DataFrame(summary_rows).to_excel(writer, sheet_name=s_name, index=False)
+            pd.DataFrame(summary_rows).to_excel(writer, sheet_name="Institutional Diagnostics", index=False)
+            sheets_written += 1
 
-        # Safeguard fallback: if no sheet has been written, write a default summary sheet
-        if not sheets_written:
-            s_name = get_unique_sheet_name("Summary")
-            pd.DataFrame([{"Status": "No Timetable Data Available"}]).to_excel(writer, sheet_name=s_name, index=False)
+        if sheets_written == 0:
+            pd.DataFrame({"Status": ["No data available"]}).to_excel(writer, sheet_name="Timetable", index=False)
 
     return output.getvalue()
