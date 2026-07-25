@@ -103,9 +103,6 @@ export const Tab1StaffRegistry: React.FC<Tab1StaffRegistryProps> = ({
           </p>
         </div>
         <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-          <button className="btn-secondary" onClick={() => setShowAddDeptModal(true)} title="Add a new department directly to the system">
-            <Building size={16} /> ➕ Add New Department
-          </button>
           <button className="btn-secondary" onClick={handleDownloadTemplate}>
             <Download size={16} /> Sample CSV Template
           </button>
