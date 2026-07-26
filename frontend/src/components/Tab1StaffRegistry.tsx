@@ -130,7 +130,7 @@ export const Tab1StaffRegistry: React.FC<Tab1StaffRegistryProps> = ({
           </div>
           <div className="stat-info">
             <div className="stat-label">Total Faculty</div>
-            <div className="stat-value">{facultyData.length > 4 ? facultyData.length : 124} <span className="stat-unit">Active</span></div>
+            <div className="stat-value">{facultyData.filter((f: any) => f.status ? f.status === 'active' : true).length} <span className="stat-unit">Active</span></div>
           </div>
         </div>
 
