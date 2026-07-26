@@ -122,12 +122,16 @@ function runConstraintSolver(
 
   // Track daily hours per subject per department
   const deptSubDailyHours: Record<string, Record<string, number[]>> = {};
+  // Track hour index usage per subject per department to enforce hour rotation
+  const deptSubHourUsage: Record<string, Record<string, number[]>> = {};
   deptNames.forEach((dept) => {
     deptSubDailyHours[dept] = {};
+    deptSubHourUsage[dept] = {};
   });
 
-  // Track daily hours per combined subject
+  // Track daily hours and hour index usage per combined subject
   const combinedDailyHours: Record<string, number[]> = {};
+  const combinedSubHourUsage: Record<string, number[]> = {};
 
   // Day order evaluation sequence based on seed shift strategy
   const daySequence: number[] = [];
@@ -237,6 +241,9 @@ function runConstraintSolver(
       if (!deptSubDailyHours[dept][sub.Subject]) {
         deptSubDailyHours[dept][sub.Subject] = Array(workingDays).fill(0);
       }
+      if (!deptSubHourUsage[dept][sub.Subject]) {
+        deptSubHourUsage[dept][sub.Subject] = Array(hoursPerDay).fill(0);
+      }
 
       while (hoursToSchedule > 0) {
         const chunkSize = isLab ? Math.min(2, hoursToSchedule) : 1;
@@ -263,23 +270,31 @@ function runConstraintSolver(
               }
 
               if (free) {
-                // Human Pedagogical Scoring Model:
-                // - Core Theory: Prefer morning slots (Hours 0, 1, 2)
-                // - Labs: Prefer mid-day/afternoon continuous blocks (Hours 2-3, 3-4, 4-5)
-                // - Student Gap Penalty: Avoid creating isolated 1-hour holes
+                // Human Pedagogical & Rotation Scoring Model:
                 let score = 0;
 
+                // 1. HEAVY HOUR REPETITION PENALTY: Prevent scheduling the same subject in the exact same hour slot across days
+                const hourRepetition = deptSubHourUsage[dept][sub.Subject][h] || 0;
+                score += hourRepetition * 500;
+
+                // 2. STAGGERED ROTATION PREFERENCE: Encourage subject to shift hour slot across Day Orders
+                const rotatedHourPreference = (d + seedShift + sortedSubjects.indexOf(sub)) % hoursPerDay;
+                if (h === rotatedHourPreference) {
+                  score -= 80;
+                }
+
+                // 3. Category slot preference
                 if (isLab) {
                   if (h >= 2 && h <= 4) score -= 60;
                   else score += 20;
                 } else if (sub.Category === 'Core Theory') {
-                  if (h <= 2) score -= 100;
+                  if (h <= 2) score -= 50;
                   else if (h >= 4) score += 70;
                 } else {
                   if (h >= 2 && h <= 4) score -= 30;
                 }
 
-                // Balance student daily workload
+                // 4. Balance student daily workload
                 const currentDayLoad = deptSlots[dept][d].filter(cell => cell !== null && cell.title !== '').length;
                 score += currentDayLoad * 25;
 
@@ -304,6 +319,7 @@ function runConstraintSolver(
             }
 
             deptSubDailyHours[dept][sub.Subject][d] += chunkSize;
+            deptSubHourUsage[dept][sub.Subject][h] = (deptSubHourUsage[dept][sub.Subject][h] || 0) + 1;
             hoursToSchedule -= chunkSize;
             placed = true;
           }

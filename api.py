@@ -7,6 +7,7 @@ import sys
 
 from scheduler import StaffRegistry, FacultyMember, InstitutionalScheduler
 from utils import export_to_pdf, export_to_excel
+from ml_tuner import MLSchedulerTuner
 
 app = FastAPI(title="SRMIST ERP Timetable Scheduler API")
 
@@ -23,6 +24,8 @@ class GenerateScheduleRequest(BaseModel):
     depts_curriculum: Dict[str, List[Dict[str, Any]]]
     combined_classes_data: List[Dict[str, Any]]
     operating_rules: Dict[str, Any]
+    heuristic_weights: Optional[Dict[str, float]] = None
+    max_trials: Optional[int] = 40
 
 def _run_scheduler_pipeline(req: GenerateScheduleRequest):
     # Build Staff Registry
@@ -62,7 +65,8 @@ def _run_scheduler_pipeline(req: GenerateScheduleRequest):
         combined_classes=req.combined_classes_data,
         working_days=working_days,
         hours_per_day=hours_per_day,
-        use_day_orders=True
+        use_day_orders=True,
+        heuristic_weights=req.heuristic_weights
     )
 
     dept_timetables, conflicts, metrics = scheduler.generate_all()
@@ -136,5 +140,90 @@ def export_excel(req: GenerateScheduleRequest):
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             headers={"Content-Disposition": f'attachment; filename="SRMIST_VDP_Timetable_Sem{semester}.xlsx"'}
         )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/schedule/tune_ml")
+@app.post("/schedule/tune_ml")
+def tune_ml_schedule(req: GenerateScheduleRequest):
+    """
+    ML-Powered Timetable Tuning Endpoint.
+    Uses surrogate optimization to search soft-constraint weight space and return
+    an optimal, high-fitness timetable without breaking any hard constraints.
+    """
+    try:
+        # Build Staff Registry
+        registry = StaffRegistry()
+        for f in req.faculty_registry_data:
+            f_id = str(f.get("Faculty_ID", "")).strip()
+            if f_id:
+                quals = [q.strip() for q in str(f.get("Qualified", "")).split(",") if q.strip()]
+                registry.add_faculty(FacultyMember(
+                    faculty_id=f_id,
+                    name=str(f.get("Name", f_id)),
+                    primary_dept=str(f.get("Primary_Dept", "")),
+                    qualified_subjects=quals,
+                    max_daily_hours=int(f.get("Max_Daily", 4)),
+                    max_consecutive_hours=int(f.get("Max_Cons", 2))
+                ))
+
+        break_option = req.operating_rules.get("break_option", "None")
+        break_slot_map = {"None": None, "Hour IV (Lunch)": 3, "Hour III (Lunch)": 2}
+        break_slot_idx = break_slot_map.get(break_option)
+
+        departments_data = {}
+        for d_name, sub_list in req.depts_curriculum.items():
+            departments_data[d_name] = {
+                "subject_data": sub_list,
+                "break_slot_idx": break_slot_idx
+            }
+
+        working_days = int(req.operating_rules.get("working_days", 4))
+        hours_per_day = int(req.operating_rules.get("hours_per_day", 6))
+
+        tuner = MLSchedulerTuner(
+            departments_data=departments_data,
+            staff_registry=registry,
+            combined_classes=req.combined_classes_data,
+            working_days=working_days,
+            hours_per_day=hours_per_day
+        )
+
+        max_trials = req.max_trials or 40
+        best_weights, best_fitness, dept_timetables, conflicts, metrics, trial_history = tuner.tune(max_trials=max_trials)
+
+        # Build Global Matrix from tuned run
+        tuned_scheduler = InstitutionalScheduler(
+            departments_data=departments_data,
+            staff_registry=registry,
+            combined_classes=req.combined_classes_data,
+            working_days=working_days,
+            hours_per_day=hours_per_day,
+            heuristic_weights=best_weights
+        )
+        dept_timetables, conflicts, metrics = tuned_scheduler.generate_all()
+
+        faculty_matrices = {}
+        all_fac_ids = sorted(list(tuned_scheduler.global_matrix.faculty_ids))
+        for fac_id in all_fac_ids:
+            fac_df = tuned_scheduler.global_matrix.to_dataframe(fac_id)
+            faculty_matrices[fac_id] = fac_df.to_dict("records")
+
+        dept_tt_dict = {}
+        for dept, tt_df in dept_timetables.items():
+            dept_tt_dict[dept] = tt_df.to_dict("records")
+
+        return {
+            "dept_timetables": dept_tt_dict,
+            "faculty_matrices": faculty_matrices,
+            "conflicts": conflicts,
+            "metrics": metrics,
+            "faculty_ids": all_fac_ids,
+            "ml_tuning": {
+                "optimal_weights": best_weights,
+                "fitness_score": best_fitness,
+                "trial_history": trial_history[:10]
+            }
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

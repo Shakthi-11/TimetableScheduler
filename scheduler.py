@@ -222,6 +222,15 @@ class InstitutionalScheduler:
     Coordinates multi-department scheduling, combined classes, staff registry checks,
     and global faculty master matrix state tracking.
     """
+    DEFAULT_HEURISTIC_WEIGHTS = {
+        "same_day": 800.0,
+        "same_hour": 1200.0,
+        "late_core": 200.0,
+        "early_core": -50.0,
+        "early_elective": 100.0,
+        "day_load": 40.0
+    }
+
     def __init__(
         self,
         departments_data: Dict[str, Dict[str, Any]],
@@ -229,7 +238,8 @@ class InstitutionalScheduler:
         combined_classes: Optional[List[Dict[str, Any]]] = None,
         working_days: int = 4,
         hours_per_day: int = 6,
-        use_day_orders: bool = True
+        use_day_orders: bool = True,
+        heuristic_weights: Optional[Dict[str, float]] = None
     ):
         self.departments_data = departments_data
         self.staff_registry = staff_registry or StaffRegistry()
@@ -237,6 +247,7 @@ class InstitutionalScheduler:
         self.working_days = working_days
         self.hours_per_day = hours_per_day
         self.use_day_orders = use_day_orders
+        self.heuristic_weights = {**self.DEFAULT_HEURISTIC_WEIGHTS, **(heuristic_weights or {})}
 
         # Roman Numerals Header Strategy
         roman_numerals = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"]
@@ -482,26 +493,27 @@ class InstitutionalScheduler:
                             if not can_do:
                                 continue
 
-                            # Heuristic Penalty Scoring
+                            # Heuristic Penalty Scoring using dynamic ML weights
+                            w = self.heuristic_weights
                             penalty = 0
                             already_on_day = subject_day_counts[name][day_name]
                             if already_on_day >= 1:
-                                penalty += 800 * already_on_day
+                                penalty += w.get("same_day", 800.0) * already_on_day
 
                             same_h_count = subject_hour_counts[name][h_name]
-                            penalty += 350 * same_h_count
+                            penalty += w.get("same_hour", 350.0) * same_h_count
 
                             if category == "Core Theory":
                                 if h_idx >= 4:
-                                    penalty += 200
+                                    penalty += w.get("late_core", 200.0)
                                 elif h_idx <= 2:
-                                    penalty -= 50
+                                    penalty += w.get("early_core", -50.0)
                             elif category == "Elective Theory":
                                 if h_idx <= 1:
-                                    penalty += 100
+                                    penalty += w.get("early_elective", 100.0)
 
                             day_load = sum(1 for cell in df_grid.loc[day_name] if cell not in ("FREE", "LUNCH BREAK"))
-                            penalty += day_load * 40
+                            penalty += day_load * w.get("day_load", 40.0)
 
                             if penalty < best_score:
                                 best_score = penalty
